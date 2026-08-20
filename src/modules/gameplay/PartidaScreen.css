@@ -1,0 +1,58 @@
+.partida-screen {
+  padding: 20px;
+  text-align: center;
+}
+
+.tablero-grid {
+  display: grid;
+  gap: 4px;
+  max-width: 600px;
+  margin: 20px auto;
+}
+
+.casilla {
+  width: 100%;
+  aspect-ratio: 1;
+  border: 1px solid #999;
+  background: #ddd;
+  cursor: pointer;
+}
+
+.casilla-hueco {
+  background: transparent;
+  border: none;
+  cursor: default;
+}
+
+.casilla-segura {
+  background: #8bc34a;
+}
+
+.casilla-detonada {
+  background: #e53935;
+}
+
+.casilla-sin-activar {
+  background: #ddd;
+}
+
+.indicador-bomba {
+  font-weight: bold;
+  font-size: 14px;
+  color: #d84315;
+}
+
+.error-text {
+  color: #e53935;
+  font-weight: bold;
+}
+
+.turno-activo {
+  color: #2e7d32;
+  font-weight: bold;
+}
+
+.turno-espera {
+  color: #757575;
+  font-style: italic;
+}
