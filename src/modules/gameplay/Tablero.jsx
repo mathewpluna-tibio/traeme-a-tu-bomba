@@ -1,7 +1,16 @@
-import { calcularDimensiones } from "./tableroUtils";
+import { useState, useEffect } from "react";
+import { calcularDimensiones, bombaEsVisible } from "./tableroUtils";
 
 export default function Tablero({ casillas = {}, onCasillaClick, deshabilitado }) {
   const { filas, columnas } = calcularDimensiones(casillas);
+
+  // "Reloj" que se actualiza cada 500ms para que las bombas del rival
+  // desaparezcan visualmente justo al cumplirse los 3 segundos
+  const [ahora, setAhora] = useState(Date.now());
+  useEffect(() => {
+    const intervalo = setInterval(() => setAhora(Date.now()), 500);
+    return () => clearInterval(intervalo);
+  }, []);
 
   const celdas = [];
   for (let f = 0; f < filas; f++) {
@@ -18,11 +27,13 @@ export default function Tablero({ casillas = {}, onCasillaClick, deshabilitado }
         ? "casilla-segura"
         : "casilla-sin-activar";
 
-      // Cuántas bombas propias hay en esta casilla (solo para mostrarte a ti
-      // mismo durante la preparación, nunca las del rival - eso lo resolvemos
-      // más adelante con el "ocultamiento a los 3 segundos", RQNF-GAM-03B)
-      const cantidadBombas = casilla.bombas?.length || 0;
+      const bombasVisibles = (casilla.bombas || []).filter((b) =>
+        bombaEsVisible(b, ahora)
+      );
 
+      const tieneAlgoVisible = bombasVisibles.length > 0;
+
+      // Sin número de cantidad, solo presencia (Fomento de la Memoria)
       celdas.push(
         <button
           key={clave}
@@ -31,9 +42,7 @@ export default function Tablero({ casillas = {}, onCasillaClick, deshabilitado }
           disabled={deshabilitado}
           onClick={() => onCasillaClick(clave)}
         >
-          {cantidadBombas > 0 && (
-            <span className="indicador-bomba">{cantidadBombas}</span>
-          )}
+          {tieneAlgoVisible && <span className="indicador-bomba">●</span>}
         </button>
       );
     }

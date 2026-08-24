@@ -1,3 +1,11 @@
+const TIEMPO_VISIBLE_RIVAL_MS = 3000;
+
+const TIEMPO_VISIBLE_MS = 3000;
+
+export function bombaEsVisible(bomba, ahora) {
+  return (ahora - bomba.colocadaEn) < TIEMPO_VISIBLE_MS;
+}
+
 // Calcula filas y columnas máximas a partir de las claves existentes en `casillas`
 export function calcularDimensiones(casillas) {
   let maxFila = 0;

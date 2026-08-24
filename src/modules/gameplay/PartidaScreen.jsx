@@ -3,11 +3,22 @@ import { usePartida } from "../../hooks/usePartida";
 import Tablero from "./Tablero";
 import FasePreparacion from "./FasePreparacion";
 
-export default function PartidaScreen({ partidaId }) {
+export default function PartidaScreen({ partidaId, onVolverAlMenu }) {
   const { partida, loading } = usePartida(partidaId);
 
   if (loading) return <p>Cargando partida...</p>;
   if (!partida) return <p>No se encontró la partida.</p>;
+
+  if (partida.estado === "cancelada") {
+    return (
+      <div className="partida-cancelada">
+        <h2>Partida cancelada</h2>
+        <p>Ningún jugador colocó bombas durante la fase de preparación.</p>
+        <button onClick={onVolverAlMenu}>Volver al menú</button>
+      </div>
+    );
+  }
+
   if (!partida.casillas) return <p>Generando tablero...</p>;
 
   return (
@@ -18,10 +29,18 @@ export default function PartidaScreen({ partidaId }) {
       <p>Ronda: {partida.ronda}</p>
       <p>Estado: {partida.estado}</p>
 
-      {partida.estado === "preparacion" ? (
+      {partida.estado === "preparacion" && (
         <FasePreparacion partidaId={partidaId} partida={partida} />
-      ) : (
-        <Tablero casillas={partida.casillas} onCasillaClick={() => {}} deshabilitado />
+      )}
+      {partida.estado === "en_curso" && (
+        <FaseJuego partidaId={partidaId} partida={partida} />
+      )}
+      {partida.estado === "finalizada" && (
+        <div>
+          <h3>Partida finalizada</h3>
+          <p>Resultado: {partida.resultado}</p>
+          {partida.ganador && <p>Ganador: {partida.ganador}</p>}
+        </div>
       )}
     </div>
   );

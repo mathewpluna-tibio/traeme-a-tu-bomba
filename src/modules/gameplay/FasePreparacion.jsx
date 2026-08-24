@@ -6,34 +6,61 @@ import Tablero from "./Tablero";
 
 const colocarBombaCallable = httpsCallable(functions, "colocarBomba");
 const finalizarTurnoCallable = httpsCallable(functions, "finalizarTurnoColocacion");
+const verificarTimeoutCallable = httpsCallable(functions, "verificarTimeoutColocacion");
+
+const TIEMPO_VISIBLE_MS = 3000;
 
 export default function FasePreparacion({ partidaId, partida }) {
   const { user } = useAuth();
   const [colocando, setColocando] = useState(false);
   const [error, setError] = useState("");
-  const yaFinalizoTurno = useRef(false); // evita llamar dos veces al agotar bombas
+  const [segundosRestantes, setSegundosRestantes] = useState(null);
+  const yaFinalizoTurno = useRef(false);
 
   const miInfo = partida.jugadores?.[user.uid];
   const bombasRestantes = miInfo?.bombasDisponibles ?? 0;
   const esMiTurno = partida.turnoColocacion?.uidActivo === user.uid;
+  const finalizaEn = partida.turnoColocacion?.finalizaEn;
 
-  // Cuando se me acaben las bombas Y sea mi turno, finalizo automáticamente
+  // Cuenta regresiva visual + verificación de timeout cada segundo
+  useEffect(() => {
+    if (!finalizaEn) {
+      setSegundosRestantes(null);
+      return;
+    }
+
+    const intervalo = setInterval(() => {
+      const restante = Math.max(0, Math.ceil((finalizaEn - Date.now()) / 1000));
+      setSegundosRestantes(restante);
+
+      if (restante === 0) {
+        // Cualquiera de los dos jugadores puede "avisar" al servidor;
+        // el servidor decide con su propio reloj si de verdad expiró.
+        verificarTimeoutCallable({ partidaId }).catch((err) =>
+          console.error("Error verificando timeout:", err)
+        );
+      }
+    }, 1000);
+
+    return () => clearInterval(intervalo);
+  }, [finalizaEn, partidaId]);
+
+  // Cierre voluntario al agotar bombas (código existente, sin cambios)
   useEffect(() => {
     if (esMiTurno && bombasRestantes === 0 && !yaFinalizoTurno.current) {
       yaFinalizoTurno.current = true;
-      finalizarTurnoCallable({ partidaId }).catch((err) => {
-        console.error("Error al finalizar turno:", err);
-        yaFinalizoTurno.current = false; // permite reintentar si falló
-      });
+      const timeoutId = setTimeout(() => {
+        finalizarTurnoCallable({ partidaId }).catch((err) => {
+          console.error("Error al finalizar turno:", err);
+          yaFinalizoTurno.current = false;
+        });
+      }, TIEMPO_VISIBLE_MS);
+      return () => clearTimeout(timeoutId);
     }
   }, [esMiTurno, bombasRestantes, partidaId]);
 
-  // Si vuelve a ser mi turno más adelante (no debería pasar en esta fase,
-  // pero por seguridad reseteamos la guardia)
   useEffect(() => {
-    if (!esMiTurno) {
-      yaFinalizoTurno.current = false;
-    }
+    if (!esMiTurno) yaFinalizoTurno.current = false;
   }, [esMiTurno]);
 
   const handleCasillaClick = async (casillaClave) => {
@@ -42,7 +69,6 @@ export default function FasePreparacion({ partidaId, partida }) {
 
     setColocando(true);
     setError("");
-
     try {
       await colocarBombaCallable({ partidaId, casillaClave });
     } catch (err) {
@@ -56,9 +82,15 @@ export default function FasePreparacion({ partidaId, partida }) {
   return (
     <div className="fase-preparacion">
       {esMiTurno ? (
-        <p className="turno-activo">Tu turno — coloca tus bombas</p>
+        <p className="turno-activo">
+          Tu turno — coloca tus bombas
+          {segundosRestantes !== null && ` (${segundosRestantes}s)`}
+        </p>
       ) : (
-        <p className="turno-espera">Esperando al rival...</p>
+        <p className="turno-espera">
+          Esperando al rival...
+          {segundosRestantes !== null && ` (${segundosRestantes}s)`}
+        </p>
       )}
       <p>Bombas disponibles: {bombasRestantes}</p>
       {error && <p className="error-text">{error}</p>}

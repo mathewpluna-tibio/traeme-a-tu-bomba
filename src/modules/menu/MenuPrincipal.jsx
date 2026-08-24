@@ -51,7 +51,7 @@ export default function MenuPrincipal() {
   };
 
   if (paso === "en_partida") {
-    return <PartidaScreen partidaId={partidaId} />;
+    return <PartidaScreen partidaId={partidaId} onVolverAlMenu={volverAlMenuDesdePartida} />;
   }
 
   if (paso === "modalidad") {
