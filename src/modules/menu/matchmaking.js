@@ -1,10 +1,19 @@
 import { ref, set } from "firebase/database";
-import { rtdb } from "../../firebase/config";
+import { doc, setDoc } from "firebase/firestore";
+import { rtdb, db } from "../../firebase/config";
 
 export async function unirseACola(modalidad, uid, clase) {
   await set(ref(rtdb, `colaEspera/${modalidad}/${uid}`), {
-    elo: 0, // TODO: Elo real
-    clase: clase || "sin_clase", // Venenosas/Caos no eligen clase todavía
+    elo: 0,
+    clase: clase || "sin_clase",
     timestamp: Date.now(),
   });
+
+  if (clase) {
+    await setDoc(
+      doc(db, "preferencias", uid),
+      { ultimaModalidad: modalidad, ultimaClase: clase },
+      { merge: true }
+    );
+  }
 }

@@ -107,6 +107,12 @@ function resolverClase(clase) {
 async function intentarEmparejar(modalidad, uid, jugador) {
   console.log(`[Matchmaking] Iniciando para uid=${uid}, modalidad=${modalidad}`);
 
+  const notifPropia = await rtdb.ref(`notificacionesPartida/${uid}`).once("value");
+  if (notifPropia.exists()) {
+    console.log(`[Matchmaking] uid=${uid} ya tiene partida asignada, ignorando.`);
+    return;
+  }
+
   const colaRef = rtdb.ref(`colaEspera/${modalidad}`);
   const snapshot = await colaRef.once("value");
   const cola = snapshot.val() || {};
@@ -142,6 +148,12 @@ async function intentarEmparejar(modalidad, uid, jugador) {
   const checkSnapshot = await rtdb.ref(`colaEspera/${modalidad}/${rival.uid}`).once("value");
   if (!checkSnapshot.exists()) {
     console.log(`[Matchmaking] El rival ya no está en la cola, saliendo.`);
+    return;
+  }
+
+  const notifRivalCheck = await rtdb.ref(`notificacionesPartida/${rival.uid}`).once("value");
+  if (notifRivalCheck.exists()) {
+    console.log(`[Matchmaking] El rival ya fue emparejado por otra ejecución, saliendo.`);
     return;
   }
 
@@ -593,22 +605,26 @@ exports.activarCasilla = onCall(async (request) => {
     await iniciarNuevaRonda(partidaId, uidInicioSiguiente);
     return { resultado: "detonacion", vidasNuevas };
   } else {
-    // --- Casilla segura (RQF-GAM-06/07) ---
+  // --- Casilla segura (RQF-GAM-06/07) ---
     const updates = {};
     updates[`casillas/${casillaClave}/segura`] = true;
 
-    // Verificamos si con esta casilla se completó la limpieza del tablero
-    const todasLasCasillas = { ...partida.casillas, [casillaClave]: { segura: true } };
-    const quedanSinActivar = Object.values(todasLasCasillas).some((c) => c.segura !== true);
+    const todasLasCasillas = { ...partida.casillas, [casillaClave]: { ...casilla, segura: true } };
 
-    if (!quedanSinActivar) {
-      // Limpieza completa -> fin de ronda
+  // Solo nos importan las casillas SIN bombas para saber si ya se
+  // completó la limpieza (las casillas con bombas nunca se marcan "segura")
+    const casillasSinBomba = Object.values(todasLasCasillas).filter(
+      (c) => !(c.bombas && c.bombas.length > 0)
+    );
+    const quedanSegurasSinMarcar = casillasSinBomba.some((c) => c.segura !== true);
+
+    if (!quedanSegurasSinMarcar) {
+    // Limpieza completa -> fin de ronda
       await rtdb.ref(`partidas/${partidaId}`).update(updates);
       const uidInicioSiguiente = siguienteInicioColocacion("limpieza", uid, uidRival);
       await iniciarNuevaRonda(partidaId, uidInicioSiguiente);
       return { resultado: "limpieza_completa" };
     } else {
-      // Sigue la ronda: pasa el turno al rival con nuevo temporizador
       updates.turnoJuego = {
         uidActivo: uidRival,
         inicioEn: Date.now(),
