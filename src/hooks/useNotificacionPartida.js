@@ -12,9 +12,10 @@ export function useNotificacionPartida() {
 
     const notifRef = ref(rtdb, `notificacionesPartida/${user.uid}`);
     const unsubscribe = onValue(notifRef, (snapshot) => {
-      if (snapshot.exists()) {
-        setPartidaId(snapshot.val());
-      }
+    console.log("[useNotificacionPartida] snapshot recibido, existe:", snapshot.exists(), "valor:", snapshot.val());
+    if (snapshot.exists()) {
+      setPartidaId(snapshot.val());
+    }
     });
 
     return unsubscribe;

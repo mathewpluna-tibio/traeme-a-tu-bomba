@@ -1,55 +1,54 @@
-import { useState, useEffect } from "react";
+import { useMachine } from "@xstate/react";
 import { doc, setDoc, getDoc } from "firebase/firestore";
 import { db } from "../../firebase/config";
 import { useAuth } from "../../context/AuthContext";
 import { unirseACola } from "./matchmaking";
 import { useNotificacionPartida } from "../../hooks/useNotificacionPartida";
+import { menuMachine } from "./menuMachine";
 import SeleccionModalidad from "./SeleccionModalidad";
 import SeleccionClase from "./SeleccionClase";
 import PartidaScreen from "../gameplay/PartidaScreen";
+import { useEffect } from "react";
 import "./MenuPrincipal.css";
 
 export default function MenuPrincipal() {
-  const [paso, setPaso] = useState("menu");
-  const [tipoAccion, setTipoAccion] = useState(null);
-  const [modalidadElegida, setModalidadElegida] = useState(null);
   const { user } = useAuth();
   const { partidaId, limpiarNotificacion } = useNotificacionPartida();
-
-  console.log("[RENDER] paso:", paso, "| partidaId:", partidaId);
+  const [state, send] = useMachine(menuMachine);
 
   useEffect(() => {
+    console.log("[MenuPrincipal] partidaId cambió a:", partidaId, "| estado actual de la máquina:", state.value);
     if (partidaId) {
-      setPaso("en_partida");
+      send({ type: "PARTIDA_ENCONTRADA", partidaId });
     }
-  }, [partidaId]);
+  }, [partidaId, send]);
 
   const iniciarFlujo = (accion) => {
-    setTipoAccion(accion);
-    setPaso("modalidad");
+    send({ type: "INICIAR_FLUJO", accion });
   };
 
   const onModalidadSeleccionada = async (modalidad) => {
-    setModalidadElegida(modalidad);
     if (modalidad === "estandar") {
-      setPaso("clase");
+      send({ type: "SELECCIONAR_MODALIDAD_ESTANDAR" });
     } else {
-      if (tipoAccion === "buscar") {
-        await unirseACola(modalidad, user.uid, null);
+      if (state.context.tipoAccion === "buscar") {
+        await unirseACola(modalidad, user.uid, null, user.isAnonymous);
       }
-      setPaso("buscando");
+      send({ type: "SELECCIONAR_MODALIDAD_OTRA", modalidad });
     }
   };
 
+  const onClaseConfirmada = () => {
+    send({ type: "CLASE_CONFIRMADA" });
+  };
+
   const cancelarFlujo = () => {
-    setPaso("menu");
-    setTipoAccion(null);
-    setModalidadElegida(null);
+    send({ type: "CANCELAR" });
   };
 
   const volverAlMenuDesdePartida = async () => {
     await limpiarNotificacion();
-    setPaso("menu");
+    send({ type: "VOLVER_AL_MENU" });
   };
 
   const jugarDeNuevo = async () => {
@@ -60,45 +59,40 @@ export default function MenuPrincipal() {
     const ultimaModalidad = prefSnap.exists() ? prefSnap.data().ultimaModalidad : "estandar";
     const ultimaClase = prefSnap.exists() ? prefSnap.data().ultimaClase : "aleatoria";
 
-    setModalidadElegida(ultimaModalidad);
-    setTipoAccion("buscar");
-
-    await unirseACola(ultimaModalidad, user.uid, ultimaClase);
-    setPaso("buscando");
+    await unirseACola(ultimaModalidad, user.uid, ultimaClase, user.isAnonymous);
+    send({ type: "JUGAR_DE_NUEVO", modalidad: ultimaModalidad });
   };
 
-  if (paso === "en_partida") {
+  if (state.matches("en_partida")) {
     return (
       <PartidaScreen
-        partidaId={partidaId}
+        partidaId={state.context.partidaId}
         onVolverAlMenu={volverAlMenuDesdePartida}
         onJugarDeNuevo={jugarDeNuevo}
       />
     );
   }
 
-  if (paso === "modalidad") {
-    return (
-      <SeleccionModalidad onSeleccionar={onModalidadSeleccionada} onCancelar={cancelarFlujo} />
-    );
+  if (state.matches("modalidad")) {
+    return <SeleccionModalidad onSeleccionar={onModalidadSeleccionada} onCancelar={cancelarFlujo} />;
   }
 
-  if (paso === "clase") {
+  if (state.matches("clase")) {
     return (
       <SeleccionClase
-        tipoAccion={tipoAccion}
-        modalidad={modalidadElegida}
-        onConfirmar={() => {}}
+        tipoAccion={state.context.tipoAccion}
+        modalidad={state.context.modalidad}
+        onConfirmar={onClaseConfirmada}
         onCancelar={cancelarFlujo}
       />
     );
   }
 
-  if (paso === "buscando") {
+  if (state.matches("buscando")) {
     return (
       <div>
-        <p>Buscando partida en modalidad: {modalidadElegida}...</p>
-        <button onClick={cancelarFlujo}>Cancelar búsqueda</button>
+        <p>Buscando partida en modalidad: {state.context.modalidad}...</p>
+        <button onClick={() => send({ type: "CANCELAR_BUSQUEDA" })}>Cancelar búsqueda</button>
       </div>
     );
   }

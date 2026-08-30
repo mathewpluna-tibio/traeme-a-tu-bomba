@@ -11,6 +11,7 @@ const Filter = require("bad-words");
 const malasPalabras = require("./malasPalabras");
 const { elegirTableroAleatorio, generarCasillas } = require("./tableros");
 const { obtenerCantidadBombas, obtenerDanoBomba } = require("./bombas");
+const { aplicarResultadoCompetitivo } = require("./competitivo");
 const { duracionTurnoJuego } = require("./turnos");
 
 //FILTRO MALAS PALABRAS
@@ -45,6 +46,10 @@ function contienePalabraProhibida(textoNormalizado, listaPalabras) {
   });
 }
 
+function quitarDigitos(texto) {
+  return texto.replace(/[0-9]/g, "");
+}
+
 exports.validarUsername = onCall((request) => {
   const username = request.data?.username;
 
@@ -60,7 +65,17 @@ exports.validarUsername = onCall((request) => {
   const esOfensivoNormalizado = filter.isProfane(textoNormalizado);
   const esOfensivoPorPrefijoSufijo = contienePalabraProhibida(textoNormalizado, malasPalabras);
 
-  const esOfensivo = esOfensivoDirecto || esOfensivoNormalizado || esOfensivoPorPrefijoSufijo;
+  const textoSinDigitos = quitarDigitos(textoNormalizado);
+  const esOfensivoSinDigitos =
+    textoSinDigitos.length > 0 &&
+    (filter.isProfane(textoSinDigitos) ||
+      contienePalabraProhibida(textoSinDigitos, malasPalabras));
+
+  const esOfensivo =
+    esOfensivoDirecto ||
+    esOfensivoNormalizado ||
+    esOfensivoPorPrefijoSufijo ||
+    esOfensivoSinDigitos;
 
   return { valido: !esOfensivo };
 });
@@ -104,6 +119,15 @@ function resolverClase(clase) {
   return clasesReales[Math.floor(Math.random() * clasesReales.length)];
 }
 
+function transactionConTimeout(ref, updateFn, timeoutMs = 3000) {
+  return Promise.race([
+    ref.transaction(updateFn),
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error("Transaction timeout")), timeoutMs)
+    ),
+  ]);
+}
+
 async function intentarEmparejar(modalidad, uid, jugador) {
   console.log(`[Matchmaking] Iniciando para uid=${uid}, modalidad=${modalidad}`);
 
@@ -145,55 +169,87 @@ async function intentarEmparejar(modalidad, uid, jugador) {
   candidatosValidos.sort((a, b) => a.timestamp - b.timestamp);
   const rival = candidatosValidos[0];
 
-  const checkSnapshot = await rtdb.ref(`colaEspera/${modalidad}/${rival.uid}`).once("value");
-  if (!checkSnapshot.exists()) {
-    console.log(`[Matchmaking] El rival ya no está en la cola, saliendo.`);
+  const parOrdenado = [uid, rival.uid].sort();
+  const lockRef = rtdb.ref(`matchmakingLocks/${modalidad}/${parOrdenado[0]}_${parOrdenado[1]}`);
+
+  let resultadoLock;
+  try {
+    resultadoLock = await transactionConTimeout(lockRef, (actual) => {
+      if (actual !== null) return undefined;
+      return true;
+    });
+  } catch (err) {
+    console.log(`[Matchmaking] Timeout en transacción de lock, abortando por seguridad.`);
     return;
   }
 
-  const notifRivalCheck = await rtdb.ref(`notificacionesPartida/${rival.uid}`).once("value");
-  if (notifRivalCheck.exists()) {
-    console.log(`[Matchmaking] El rival ya fue emparejado por otra ejecución, saliendo.`);
+  if (!resultadoLock.committed) {
+    console.log(`[Matchmaking] Este par ya fue reservado por otra ejecución, saliendo.`);
     return;
   }
 
-  const partidaRef = rtdb.ref("partidas").push();
-  const partidaId = partidaRef.key;
+  // --- A partir de aquí, SIEMPRE liberamos el lock al terminar,
+  // sin importar si la partida se creó o si algo falló en el camino. ---
+  try {
+    const checkSnapshot = await rtdb.ref(`colaEspera/${modalidad}/${rival.uid}`).once("value");
+    if (!checkSnapshot.exists()) {
+      console.log(`[Matchmaking] El rival ya no está en la cola, saliendo.`);
+      return;
+    }
 
-  // --- NUEVO: resolver "aleatoria" a una clase real, y calcular bombas iniciales ---
-  const claseJugador = resolverClase(jugador.clase);
-  const claseRival = resolverClase(rival.clase);
+    const notifRivalCheck = await rtdb.ref(`notificacionesPartida/${rival.uid}`).once("value");
+    if (notifRivalCheck.exists()) {
+      console.log(`[Matchmaking] El rival ya fue emparejado por otra ejecución, saliendo.`);
+      return;
+    }
 
-  const updates = {};
-  updates[`colaEspera/${modalidad}/${uid}`] = null;
-  updates[`colaEspera/${modalidad}/${rival.uid}`] = null;
-  updates[`partidas/${partidaId}`] = {
-    modalidad,
-    tablero: null,
-    ronda: 1,
-    estado: "generando_tablero",
-    jugadores: {
-      [uid]: {
-        vidas: 3,
-        clase: claseJugador,
-        listo: false,
-        bombasDisponibles: obtenerCantidadBombas(claseJugador, 1),
+    const notifPropiaCheck = await rtdb.ref(`notificacionesPartida/${uid}`).once("value");
+    if (notifPropiaCheck.exists()) {
+      console.log(`[Matchmaking] Yo ya fui emparejado por otra ejecución, saliendo.`);
+      return;
+    }
+
+    const partidaRef = rtdb.ref("partidas").push();
+    const partidaId = partidaRef.key;
+
+    const claseJugador = resolverClase(jugador.clase);
+    const claseRival = resolverClase(rival.clase);
+
+    const updates = {};
+    updates[`colaEspera/${modalidad}/${uid}`] = null;
+    updates[`colaEspera/${modalidad}/${rival.uid}`] = null;
+    updates[`partidas/${partidaId}`] = {
+      modalidad,
+      tablero: null,
+      ronda: 1,
+      estado: "generando_tablero",
+      jugadores: {
+        [uid]: {
+          vidas: 3,
+          clase: claseJugador,
+          listo: false,
+          bombasDisponibles: obtenerCantidadBombas(claseJugador, 1),
+        },
+        [rival.uid]: {
+          vidas: 3,
+          clase: claseRival,
+          listo: false,
+          bombasDisponibles: obtenerCantidadBombas(claseRival, 1),
+        },
       },
-      [rival.uid]: {
-        vidas: 3,
-        clase: claseRival,
-        listo: false,
-        bombasDisponibles: obtenerCantidadBombas(claseRival, 1),
-      },
-    },
-    creadaEn: ahora,
-  };
-  updates[`notificacionesPartida/${uid}`] = partidaId;
-  updates[`notificacionesPartida/${rival.uid}`] = partidaId;
+      creadaEn: ahora,
+    };
+    updates[`notificacionesPartida/${uid}`] = partidaId;
+    updates[`notificacionesPartida/${rival.uid}`] = partidaId;
 
-  await rtdb.ref().update(updates);
+    await rtdb.ref().update(updates);
 
-  console.log(`[Matchmaking] ¡Partida creada! ID: ${partidaId} (esperando generación de tablero)`);
+    console.log(`[Matchmaking] ¡Partida creada! ID: ${partidaId} (esperando generación de tablero)`);
+  } finally {
+    // Liberamos el lock SIEMPRE - éxito, error, o cualquier `return`
+    // dentro del bloque try anterior pasará por aquí antes de salir.
+    await lockRef.remove();
+  }
 }
 
 exports.onPartidaCreada = onValueWritten(
@@ -339,13 +395,40 @@ exports.colocarBomba = onCall(async (request) => {
 async function avanzarFaseColocacion(partidaId, uidQueTermina) {
   const partidaSnap = await rtdb.ref(`partidas/${partidaId}`).once("value");
   const partida = partidaSnap.val();
-
   if (!partida || partida.estado !== "preparacion") return;
-  if (partida.turnoColocacion?.uidActivo !== uidQueTermina) return;
 
-  const uids = Object.keys(partida.jugadores);
+  // Verificación de idempotencia SIN transacción: si el turno activo ya
+  // no es este jugador, alguien más ya lo procesó - abortamos limpio.
+  if (partida.turnoColocacion?.uidActivo !== uidQueTermina) {
+    console.log(`[Preparación] Turno ya fue procesado para ${uidQueTermina}, abortando.`);
+    return;
+  }
+
+  // Esperamos a que la última bomba complete su visibilidad de 3s
+  const TIEMPO_VISIBLE_MS = 3000;
+  const casillas = partida.casillas || {};
+  let bombaMasReciente = 0;
+  Object.values(casillas).forEach((casilla) => {
+    (casilla.bombas || []).forEach((bomba) => {
+      if (bomba.colocadaEn > bombaMasReciente) bombaMasReciente = bomba.colocadaEn;
+    });
+  });
+  const tiempoDesdeUltimaBomba = Date.now() - bombaMasReciente;
+  if (bombaMasReciente > 0 && tiempoDesdeUltimaBomba < TIEMPO_VISIBLE_MS) {
+    await new Promise((resolve) => setTimeout(resolve, TIEMPO_VISIBLE_MS - tiempoDesdeUltimaBomba));
+  }
+
+  // Re-verificamos justo antes de escribir, por si algo cambió durante la espera
+  const partidaFrescaSnap = await rtdb.ref(`partidas/${partidaId}`).once("value");
+  const partidaFresca = partidaFrescaSnap.val();
+  if (!partidaFresca || partidaFresca.turnoColocacion?.uidActivo !== uidQueTermina) {
+    console.log(`[Preparación] Turno cambió durante la espera para ${uidQueTermina}, abortando.`);
+    return;
+  }
+
+  const uids = Object.keys(partidaFresca.jugadores);
   const uidRival = uids.find((id) => id !== uidQueTermina);
-  const yaJugoRival = partida.jugadores[uidRival]?.yaColoco === true;
+  const yaJugoRival = partidaFresca.jugadores[uidRival]?.yaColoco === true;
 
   if (!yaJugoRival) {
     const DURACION_TURNO_MS = 30000;
@@ -359,35 +442,33 @@ async function avanzarFaseColocacion(partidaId, uidQueTermina) {
     });
     console.log(`[Preparación] Turno de ${uidQueTermina} terminado, pasa a ${uidRival}`);
   } else {
-    // Ambos ya terminaron su turno de colocación.
-    // --- NUEVO: verificar cancelación por inactividad total (solo ronda 1) ---
-    const coloroQuienTermina = partida.jugadores[uidQueTermina]?.coloco === true;
-    const coloroRival = partida.jugadores[uidRival]?.coloco === true;
+    const coloroQuienTermina = partidaFresca.jugadores[uidQueTermina]?.coloco === true;
+    const coloroRival = partidaFresca.jugadores[uidRival]?.coloco === true;
 
-    if (partida.ronda === 1 && !coloroQuienTermina && !coloroRival) {
+    if (partidaFresca.ronda === 1 && !coloroQuienTermina && !coloroRival) {
       await rtdb.ref(`partidas/${partidaId}`).update({
         [`jugadores/${uidQueTermina}/yaColoco`]: true,
         estado: "cancelada",
         turnoColocacion: null,
         motivoCancelacion: "inactividad",
       });
-      console.log(`[Preparación] Partida ${partidaId} cancelada: ningún jugador colocó bombas`);
+      console.log(`[Preparación] Partida ${partidaId} cancelada: nadie colocó bombas`);
       return;
     }
 
-    // Dentro del bloque "else" de avanzarFaseColocacion, reemplaza el update final por:
-    const uidAzul = uids.find((id) => partida.jugadores[id].color === "azul");
+    const uidAzul = uids.find((id) => partidaFresca.jugadores[id].color === "azul");
     await rtdb.ref(`partidas/${partidaId}`).update({
       [`jugadores/${uidQueTermina}/yaColoco`]: true,
       estado: "en_curso",
       turnoColocacion: null,
       turnoActual: uidAzul,
       turnoJuego: {
-      uidActivo: uidAzul,
-      inicioEn: Date.now(),
-      finalizaEn: Date.now() + duracionTurnoJuego(partida.ronda),
-    },
-  });
+        uidActivo: uidAzul,
+        inicioEn: Date.now(),
+        finalizaEn: Date.now() + duracionTurnoJuego(partidaFresca.ronda),
+      },
+    });
+    console.log(`[Preparación] Ambos listos, partida ${partidaId} inicia`);
   }
 }
 
@@ -520,7 +601,7 @@ async function iniciarNuevaRonda(partidaId, uidInicial) {
   console.log(`[Ronda] Nueva ronda ${nuevaRonda} para partida ${partidaId}, inicia ${uidInicial}`);
 }
 
-// --- Helper: desempate al llegar al límite de 10 rondas (RQNF-GAM-10) ---
+// Reemplaza tu resolverDesempatePorRondas actual por esta versión:
 async function resolverDesempatePorRondas(partidaId, partida) {
   const uids = Object.keys(partida.jugadores);
   const [uidA, uidB] = uids;
@@ -530,8 +611,6 @@ async function resolverDesempatePorRondas(partidaId, partida) {
   const updates = { estado: "finalizada", turnoJuego: null };
 
   if (vidasA === vidasB) {
-    // Empate técnico: ajuste de Elo (la lógica de Elo real se conecta
-    // en el Módulo Competitivo; por ahora dejamos marcado el resultado)
     updates.resultado = "empate";
   } else {
     const uidGanador = vidasA > vidasB ? uidA : uidB;
@@ -541,9 +620,19 @@ async function resolverDesempatePorRondas(partidaId, partida) {
 
   await rtdb.ref(`partidas/${partidaId}`).update(updates);
   console.log(`[Partida] Finalizada por límite de rondas: ${partidaId}`);
+
+  const partidaActualizada = { ...partida, ...updates };
+  if (updates.resultado === "empate") {
+    await aplicarResultadoCompetitivo(partidaId, partidaActualizada, { tipo: "empate" });
+  } else {
+    await aplicarResultadoCompetitivo(partidaId, partidaActualizada, {
+      tipo: "victoria",
+      ganador: updates.ganador,
+    });
+  }
 }
 
-// --- Helper: termina la partida por pérdida de todas las vidas (RQF-GAM-11) ---
+// Reemplaza tu finalizarPartidaPorDerrota actual por esta versión (le agregué 2 líneas al final):
 async function finalizarPartidaPorDerrota(partidaId, uidPerdedor, uidGanador) {
   await rtdb.ref(`partidas/${partidaId}`).update({
     estado: "finalizada",
@@ -552,6 +641,10 @@ async function finalizarPartidaPorDerrota(partidaId, uidPerdedor, uidGanador) {
     turnoJuego: null,
   });
   console.log(`[Partida] ${partidaId} finalizada, ganador: ${uidGanador}`);
+
+  const partidaSnap = await rtdb.ref(`partidas/${partidaId}`).once("value");
+  const partida = partidaSnap.val();
+  await aplicarResultadoCompetitivo(partidaId, partida, { tipo: "victoria", ganador: uidGanador });
 }
 
 // --- Función principal: activar una casilla durante el juego ---
@@ -674,3 +767,80 @@ exports.verificarTimeoutJuego = onCall(async (request) => {
 
   return { expirado: true, resultado: "timeout" };
 });
+
+async function actualizarPerfilTrasPartida(uid, modalidad, datos) {
+  const perfilRef = firestore.collection("usuarios").doc(uid);
+  const perfilSnap = await perfilRef.get();
+  if (!perfilSnap.exists) return;
+
+  const stats = perfilSnap.data()?.estadisticas?.[modalidad] || {};
+  const nuevoRango = determinarRango(datos.elo);
+
+  const actualizaciones = {
+    [`estadisticas.${modalidad}.elo`]: datos.elo,
+    [`estadisticas.${modalidad}.rango`]: nuevoRango,
+  };
+
+  if (datos.esVictoria !== undefined) {
+    actualizaciones[`estadisticas.${modalidad}.victorias`] = FieldValue.increment(
+      datos.esVictoria ? 1 : 0
+    );
+    actualizaciones[`estadisticas.${modalidad}.derrotas`] = FieldValue.increment(
+      datos.esVictoria ? 0 : 1
+    );
+    actualizaciones[`estadisticas.${modalidad}.vidasPerdidas`] = FieldValue.increment(
+      datos.vidasPerdidas || 0
+    );
+    if (datos.esVictoria && datos.vidasPerdidas === 0) {
+      actualizaciones[`estadisticas.${modalidad}.partidasSinPerderVida`] = FieldValue.increment(1);
+    }
+    actualizaciones.coronas = FieldValue.increment(datos.coronas || 0);
+  }
+
+  await perfilRef.update(actualizaciones);
+  console.log(`[Competitivo] Perfil ${uid} actualizado: elo=${datos.elo}, rango=${nuevoRango}`);
+}
+
+async function finalizarPartidaPorDerrota(partidaId, uidPerdedor, uidGanador) {
+  await rtdb.ref(`partidas/${partidaId}`).update({
+    estado: "finalizada",
+    resultado: "victoria",
+    ganador: uidGanador,
+    turnoJuego: null,
+  });
+  console.log(`[Partida] ${partidaId} finalizada, ganador: ${uidGanador}`);
+
+  const partidaSnap = await rtdb.ref(`partidas/${partidaId}`).once("value");
+  const partida = partidaSnap.val();
+  await aplicarResultadoCompetitivo(partidaId, partida, { tipo: "victoria", ganador: uidGanador });
+}
+
+async function resolverDesempatePorRondas(partidaId, partida) {
+  const uids = Object.keys(partida.jugadores);
+  const [uidA, uidB] = uids;
+  const vidasA = partida.jugadores[uidA].vidas;
+  const vidasB = partida.jugadores[uidB].vidas;
+
+  const updates = { estado: "finalizada", turnoJuego: null };
+
+  if (vidasA === vidasB) {
+    updates.resultado = "empate";
+  } else {
+    const uidGanador = vidasA > vidasB ? uidA : uidB;
+    updates.resultado = "victoria";
+    updates.ganador = uidGanador;
+  }
+
+  await rtdb.ref(`partidas/${partidaId}`).update(updates);
+  console.log(`[Partida] Finalizada por límite de rondas: ${partidaId}`);
+
+  const partidaActualizada = { ...partida, ...updates };
+  if (updates.resultado === "empate") {
+    await aplicarResultadoCompetitivo(partidaId, partidaActualizada, { tipo: "empate" });
+  } else {
+    await aplicarResultadoCompetitivo(partidaId, partidaActualizada, {
+      tipo: "victoria",
+      ganador: updates.ganador,
+    });
+  }
+}

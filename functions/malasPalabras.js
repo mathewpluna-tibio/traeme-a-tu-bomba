@@ -15,6 +15,9 @@ module.exports = [
   "boobs", "penis", "vagina", "orgasm", "masturbate", "anal",
   "blowjob", "handjob", "cum", "horny",
   "drsexo", "mrsexo", "sexoman", "sexlord", "sexking", "sexgod",
-  "putazo", "putona", "sexybaby", "sexybitch",
+  "putazo", "putona", "sexybaby", "sexybitch", "putos", "putas", "putitos", 
+  "putitas", "pendejos", "pendejas", "perras", "vergon", "pitudo",
+  "maricones", "jotos", "lamehuevos", "culoroto", "zorrita", "zorra",
+  "perra", "golfas", 
 ];
 

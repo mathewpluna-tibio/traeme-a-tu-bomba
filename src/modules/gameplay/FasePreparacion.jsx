@@ -20,6 +20,7 @@ export default function FasePreparacion({ partidaId, partida }) {
   const miInfo = partida.jugadores?.[user.uid];
   const bombasRestantes = miInfo?.bombasDisponibles ?? 0;
   const esMiTurno = partida.turnoColocacion?.uidActivo === user.uid;
+  console.log("[FasePreparacion] uidActivo:", partida.turnoColocacion?.uidActivo, "| mi uid:", user.uid, "| esMiTurno:", esMiTurno, "| bombasRestantes:", bombasRestantes);
   const finalizaEn = partida.turnoColocacion?.finalizaEn;
 
   // Cuenta regresiva visual + verificación de timeout cada segundo
@@ -49,19 +50,36 @@ export default function FasePreparacion({ partidaId, partida }) {
   useEffect(() => {
     if (esMiTurno && bombasRestantes === 0 && !yaFinalizoTurno.current) {
       yaFinalizoTurno.current = true;
-      const timeoutId = setTimeout(() => {
-        finalizarTurnoCallable({ partidaId }).catch((err) => {
-          console.error("Error al finalizar turno:", err);
-          yaFinalizoTurno.current = false;
-        });
-      }, TIEMPO_VISIBLE_MS);
-      return () => clearTimeout(timeoutId);
+      finalizarTurnoCallable({ partidaId }).catch((err) => {
+        console.error("Error al finalizar turno:", err);
+        yaFinalizoTurno.current = false;
+      });
     }
   }, [esMiTurno, bombasRestantes, partidaId]);
 
   useEffect(() => {
     if (!esMiTurno) yaFinalizoTurno.current = false;
   }, [esMiTurno]);
+
+  useEffect(() => {
+  if (!finalizaEn || !esMiTurno) {
+    setSegundosRestantes(null);
+    return;
+  }
+
+  const intervalo = setInterval(() => {
+    const restante = Math.max(0, Math.ceil((finalizaEn - Date.now()) / 1000));
+    setSegundosRestantes(restante);
+
+    if (restante === 0 && esMiTurno) {
+      verificarTimeoutCallable({ partidaId }).catch((err) =>
+        console.error("Error verificando timeout:", err)
+      );
+    }
+  }, 1000);
+
+  return () => clearInterval(intervalo);
+}, [finalizaEn, partidaId, esMiTurno]);
 
   const handleCasillaClick = async (casillaClave) => {
     if (colocando || !esMiTurno) return;
