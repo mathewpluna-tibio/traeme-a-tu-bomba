@@ -10,7 +10,7 @@ const MODALIDADES = [
   { key: "elementales", label: "Bombas Elementales" },
 ];
 
-export default function PerfilPage() {
+export default function PerfilPage({ onVolver }) {
   const { profile, loading } = useUserProfile();
   const [modalidad, setModalidad] = useState("general");
 
@@ -19,6 +19,8 @@ export default function PerfilPage() {
 
   return (
     <div className="perfil-page">
+      <button onClick={onVolver} style={{ margin: "12px" }}>← Volver al menú</button>
+     
       <ProfileHeader profile={profile} />
 
       {/* Selector de modalidad (RQF-PER-05) */}

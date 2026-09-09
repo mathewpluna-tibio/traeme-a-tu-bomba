@@ -29,3 +29,7 @@ export async function unirseACola(modalidad, uid, clase, esInvitado) {
     );
   }
 }
+
+export async function salirDeCola(modalidad, uid) {
+  await remove(ref(rtdb, `colaEspera/${modalidad}/${uid}`));
+}

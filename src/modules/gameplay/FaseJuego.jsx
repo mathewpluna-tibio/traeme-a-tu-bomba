@@ -12,6 +12,7 @@ export default function FaseJuego({ partidaId, partida }) {
   const [procesando, setProcesando] = useState(false);
   const [error, setError] = useState("");
   const [segundosRestantes, setSegundosRestantes] = useState(null);
+  const [casillaEnProceso, setCasillaEnProceso] = useState(null);
 
   const esMiTurno = partida.turnoJuego?.uidActivo === user.uid;
   const finalizaEn = partida.turnoJuego?.finalizaEn;
@@ -34,18 +35,20 @@ export default function FaseJuego({ partidaId, partida }) {
   }, [finalizaEn, partidaId]);
 
   const handleCasillaClick = async (casillaClave) => {
-    if (procesando || !esMiTurno) return;
-    setProcesando(true);
-    setError("");
-    try {
-      await activarCasillaCallable({ partidaId, casillaClave });
-    } catch (err) {
-      console.error("Error al activar casilla:", err);
-      setError(err.message || "No se pudo activar la casilla.");
-    } finally {
-      setProcesando(false);
-    }
-  };
+  if (procesando || !esMiTurno) return;
+  setProcesando(true);
+  setCasillaEnProceso(casillaClave); // feedback inmediato, antes de llamar al servidor
+  setError("");
+  try {
+    await activarCasillaCallable({ partidaId, casillaClave });
+  } catch (err) {
+    console.error("Error al activar casilla:", err);
+    setError(err.message || "No se pudo activar la casilla.");
+  } finally {
+    setProcesando(false);
+    setCasillaEnProceso(null);
+  }
+};
 
   const miVida = partida.jugadores?.[user.uid]?.vidas ?? 0;
   const rivalUid = Object.keys(partida.jugadores || {}).find((id) => id !== user.uid);
@@ -71,6 +74,7 @@ export default function FaseJuego({ partidaId, partida }) {
         casillas={partida.casillas}
         onCasillaClick={handleCasillaClick}
         deshabilitado={!esMiTurno || procesando}
+        casillaEnProceso={casillaEnProceso}
       />
     </div>
   );

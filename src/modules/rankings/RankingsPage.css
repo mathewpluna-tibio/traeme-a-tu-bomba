@@ -1,0 +1,47 @@
+.rankings-page {
+  padding: 20px;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.rankings-tabs-modalidad,
+.rankings-tabs-categoria {
+  display: flex;
+  gap: 8px;
+  margin: 12px 0;
+  flex-wrap: wrap;
+}
+
+.rankings-tabs-modalidad button,
+.rankings-tabs-categoria button {
+  padding: 8px 14px;
+  border: 1px solid #ccc;
+  background: #f5f5f5;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.rankings-tabs-modalidad button.activo,
+.rankings-tabs-categoria button.activo {
+  background: #ff8c00;
+  color: white;
+  border-color: #ff8c00;
+}
+
+.rankings-tabla {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 16px;
+}
+
+.rankings-tabla th,
+.rankings-tabla td {
+  padding: 8px 12px;
+  text-align: left;
+  border-bottom: 1px solid #eee;
+}
+
+.rankings-tabla tr:first-child td {
+  font-weight: bold;
+  color: #ff8c00;
+}

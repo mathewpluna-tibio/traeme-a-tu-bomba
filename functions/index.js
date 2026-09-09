@@ -13,6 +13,8 @@ const { elegirTableroAleatorio, generarCasillas } = require("./tableros");
 const { obtenerCantidadBombas, obtenerDanoBomba } = require("./bombas");
 const { aplicarResultadoCompetitivo } = require("./competitivo");
 const { duracionTurnoJuego } = require("./turnos");
+const { getFirestore } = require("firebase-admin/firestore");
+const { registrarProgreso } = require("./misiones");
 
 //FILTRO MALAS PALABRAS
 
@@ -50,7 +52,7 @@ function quitarDigitos(texto) {
   return texto.replace(/[0-9]/g, "");
 }
 
-exports.validarUsername = onCall((request) => {
+exports.validarUsername = onCall(async (request) => {
   const username = request.data?.username;
 
   if (!username || typeof username !== "string" || username.trim().length === 0) {
@@ -77,7 +79,23 @@ exports.validarUsername = onCall((request) => {
     esOfensivoPorPrefijoSufijo ||
     esOfensivoSinDigitos;
 
-  return { valido: !esOfensivo };
+  if (esOfensivo) {
+    return { valido: false, motivo: "ofensivo" };
+  }
+
+  // Verificación de unicidad, usando Admin SDK (ignora reglas de seguridad)
+  const firestore = getFirestore();
+  const snapshot = await firestore
+    .collection("usuarios")
+    .where("username", "==", username.trim())
+    .limit(1)
+    .get();
+
+  if (!snapshot.empty) {
+    return { valido: false, motivo: "en_uso" };
+  }
+
+  return { valido: true };
 });
 
 //TRIGGER MATCHMAKING - RECIBE CADA VEZ QUE CAMBIA LA COLA
@@ -150,16 +168,32 @@ async function intentarEmparejar(modalidad, uid, jugador) {
     return;
   }
 
-  const ahora = Date.now();
-  const tiempoEsperando = ahora - jugador.timestamp;
+// Reemplaza este bloque completo dentro de intentarEmparejar:
 
-  let tolerancia = 10;
-  if (tiempoEsperando >= 15000) tolerancia = 60;
-  else if (tiempoEsperando >= 5000) tolerancia = 30;
+const ahora = Date.now();
+const tiempoEsperando = ahora - jugador.timestamp;
 
-  const candidatosValidos = candidatos.filter(
-    (c) => Math.abs(c.elo - jugador.elo) <= tolerancia
-  );
+const UMBRAL_SENOR = 1000;
+const UMBRAL_SENOR_SIN_LIMITE = 1150;
+
+const candidatosValidos = candidatos.filter((c) => {
+  const tiempoEsperandoCandidato = ahora - c.timestamp;
+  const tiempoMax = Math.max(tiempoEsperando, tiempoEsperandoCandidato);
+
+  if (jugador.elo >= UMBRAL_SENOR_SIN_LIMITE) {
+    if (c.elo < UMBRAL_SENOR) return false;
+
+    let tolerancia = 30;
+    if (tiempoMax >= 15000) tolerancia = Infinity;
+    else if (tiempoMax >= 5000) tolerancia = 60;
+    return Math.abs(c.elo - jugador.elo) <= tolerancia;
+  }
+
+  let tolerancia = 30;
+  if (tiempoMax >= 15000) tolerancia = 150;
+  else if (tiempoMax >= 5000) tolerancia = 60;
+  return Math.abs(c.elo - jugador.elo) <= tolerancia;
+});
 
   if (candidatosValidos.length === 0) {
     console.log(`[Matchmaking] Ningún candidato dentro de tolerancia, saliendo.`);
@@ -188,8 +222,6 @@ async function intentarEmparejar(modalidad, uid, jugador) {
     return;
   }
 
-  // --- A partir de aquí, SIEMPRE liberamos el lock al terminar,
-  // sin importar si la partida se creó o si algo falló en el camino. ---
   try {
     const checkSnapshot = await rtdb.ref(`colaEspera/${modalidad}/${rival.uid}`).once("value");
     if (!checkSnapshot.exists()) {
@@ -220,6 +252,7 @@ async function intentarEmparejar(modalidad, uid, jugador) {
     updates[`colaEspera/${modalidad}/${rival.uid}`] = null;
     updates[`partidas/${partidaId}`] = {
       modalidad,
+      tipo: "matchmaking",
       tablero: null,
       ronda: 1,
       estado: "generando_tablero",
@@ -228,12 +261,16 @@ async function intentarEmparejar(modalidad, uid, jugador) {
           vidas: 3,
           clase: claseJugador,
           listo: false,
+          esInvitado: jugador.esInvitado === true,
+          eloInicial: jugador.elo ?? 0,
           bombasDisponibles: obtenerCantidadBombas(claseJugador, 1),
         },
         [rival.uid]: {
           vidas: 3,
           clase: claseRival,
           listo: false,
+          esInvitado: rival.esInvitado === true,
+          eloInicial: rival.elo ?? 0,
           bombasDisponibles: obtenerCantidadBombas(claseRival, 1),
         },
       },
@@ -246,8 +283,7 @@ async function intentarEmparejar(modalidad, uid, jugador) {
 
     console.log(`[Matchmaking] ¡Partida creada! ID: ${partidaId} (esperando generación de tablero)`);
   } finally {
-    // Liberamos el lock SIEMPRE - éxito, error, o cualquier `return`
-    // dentro del bloque try anterior pasará por aquí antes de salir.
+
     await lockRef.remove();
   }
 }
@@ -267,13 +303,10 @@ exports.onPartidaCreada = onValueWritten(
     const tipoTablero = elegirTableroAleatorio();
     const casillasIniciales = generarCasillas(tipoTablero, 1);
 
-    // Leemos los jugadores para asignar colores
     const partidaSnap = await rtdb.ref(`partidas/${partidaId}/jugadores`).once("value");
     const jugadores = partidaSnap.val();
     const uids = Object.keys(jugadores);
 
-    // Asignación aleatoria de quién es azul (tu documento no especifica
-    // el criterio de asignación inicial, solo que "el azul siempre empieza")
     const indiceAzul = Math.floor(Math.random() * 2);
     const uidAzul = uids[indiceAzul];
     const uidRojo = uids[1 - indiceAzul];
@@ -388,6 +421,11 @@ exports.colocarBomba = onCall(async (request) => {
   updates[`partidas/${partidaId}/jugadores/${uid}/coloco`] = true;
 
   await rtdb.ref().update(updates);
+
+  await registrarProgreso(uid, "bomba_colocada", 1);
+  if (jugador.clase === "bombota") {
+    await registrarProgreso(uid, "partida_con_bombota", 1);
+  }
 
   return { exito: true, bombasRestantes: jugador.bombasDisponibles - 1 };
 });
@@ -632,7 +670,6 @@ async function resolverDesempatePorRondas(partidaId, partida) {
   }
 }
 
-// Reemplaza tu finalizarPartidaPorDerrota actual por esta versión (le agregué 2 líneas al final):
 async function finalizarPartidaPorDerrota(partidaId, uidPerdedor, uidGanador) {
   await rtdb.ref(`partidas/${partidaId}`).update({
     estado: "finalizada",
@@ -647,7 +684,6 @@ async function finalizarPartidaPorDerrota(partidaId, uidPerdedor, uidGanador) {
   await aplicarResultadoCompetitivo(partidaId, partida, { tipo: "victoria", ganador: uidGanador });
 }
 
-// --- Función principal: activar una casilla durante el juego ---
 exports.activarCasilla = onCall(async (request) => {
   const uid = request.auth?.uid;
   if (!uid) {
@@ -681,7 +717,6 @@ exports.activarCasilla = onCall(async (request) => {
   const bombas = casilla.bombas || [];
 
   if (bombas.length > 0) {
-    // --- Detonación: aplica daño al jugador activo (RQF-GAM-08/08B) ---
     const danoTotal = bombas.reduce((sum, b) => sum + (b.dano || 0), 0);
     const vidasActuales = partida.jugadores[uid].vidas;
     const vidasNuevas = Math.max(0, vidasActuales - danoTotal);
@@ -698,14 +733,13 @@ exports.activarCasilla = onCall(async (request) => {
     await iniciarNuevaRonda(partidaId, uidInicioSiguiente);
     return { resultado: "detonacion", vidasNuevas };
   } else {
-  // --- Casilla segura (RQF-GAM-06/07) ---
+    await registrarProgreso(uid, "casilla_segura_descubierta", 1);
+
     const updates = {};
     updates[`casillas/${casillaClave}/segura`] = true;
 
     const todasLasCasillas = { ...partida.casillas, [casillaClave]: { ...casilla, segura: true } };
 
-  // Solo nos importan las casillas SIN bombas para saber si ya se
-  // completó la limpieza (las casillas con bombas nunca se marcan "segura")
     const casillasSinBomba = Object.values(todasLasCasillas).filter(
       (c) => !(c.bombas && c.bombas.length > 0)
     );
@@ -750,7 +784,7 @@ exports.verificarTimeoutJuego = onCall(async (request) => {
   const uidActivo = partida.turnoJuego.uidActivo;
   const uidRival = Object.keys(partida.jugadores).find((id) => id !== uidActivo);
   const vidasActuales = partida.jugadores[uidActivo].vidas;
-  const vidasNuevas = Math.max(0, vidasActuales - 1); // RQF-GAM-09: pierde 1 vida
+  const vidasNuevas = Math.max(0, vidasActuales - 1); 
 
   await rtdb.ref(`partidas/${partidaId}/jugadores/${uidActivo}/vidas`).set(vidasNuevas);
   console.log(`[Juego] Timeout de ${uidActivo}, pierde 1 vida, restantes=${vidasNuevas}`);
@@ -760,87 +794,10 @@ exports.verificarTimeoutJuego = onCall(async (request) => {
     return { expirado: true, resultado: "derrota" };
   }
 
-  // RQF-GAM-09: si expira, termina la ronda (mismo tratamiento que detonación
-  // en cuanto a quién inicia la siguiente colocación, ya que "termina la ronda")
-  const uidInicioSiguiente = siguienteInicioColocacion("detonacion", uidActivo, uidRival);
+ const uidInicioSiguiente = siguienteInicioColocacion("detonacion", uidActivo, uidRival);
   await iniciarNuevaRonda(partidaId, uidInicioSiguiente);
 
   return { expirado: true, resultado: "timeout" };
 });
 
-async function actualizarPerfilTrasPartida(uid, modalidad, datos) {
-  const perfilRef = firestore.collection("usuarios").doc(uid);
-  const perfilSnap = await perfilRef.get();
-  if (!perfilSnap.exists) return;
-
-  const stats = perfilSnap.data()?.estadisticas?.[modalidad] || {};
-  const nuevoRango = determinarRango(datos.elo);
-
-  const actualizaciones = {
-    [`estadisticas.${modalidad}.elo`]: datos.elo,
-    [`estadisticas.${modalidad}.rango`]: nuevoRango,
-  };
-
-  if (datos.esVictoria !== undefined) {
-    actualizaciones[`estadisticas.${modalidad}.victorias`] = FieldValue.increment(
-      datos.esVictoria ? 1 : 0
-    );
-    actualizaciones[`estadisticas.${modalidad}.derrotas`] = FieldValue.increment(
-      datos.esVictoria ? 0 : 1
-    );
-    actualizaciones[`estadisticas.${modalidad}.vidasPerdidas`] = FieldValue.increment(
-      datos.vidasPerdidas || 0
-    );
-    if (datos.esVictoria && datos.vidasPerdidas === 0) {
-      actualizaciones[`estadisticas.${modalidad}.partidasSinPerderVida`] = FieldValue.increment(1);
-    }
-    actualizaciones.coronas = FieldValue.increment(datos.coronas || 0);
-  }
-
-  await perfilRef.update(actualizaciones);
-  console.log(`[Competitivo] Perfil ${uid} actualizado: elo=${datos.elo}, rango=${nuevoRango}`);
-}
-
-async function finalizarPartidaPorDerrota(partidaId, uidPerdedor, uidGanador) {
-  await rtdb.ref(`partidas/${partidaId}`).update({
-    estado: "finalizada",
-    resultado: "victoria",
-    ganador: uidGanador,
-    turnoJuego: null,
-  });
-  console.log(`[Partida] ${partidaId} finalizada, ganador: ${uidGanador}`);
-
-  const partidaSnap = await rtdb.ref(`partidas/${partidaId}`).once("value");
-  const partida = partidaSnap.val();
-  await aplicarResultadoCompetitivo(partidaId, partida, { tipo: "victoria", ganador: uidGanador });
-}
-
-async function resolverDesempatePorRondas(partidaId, partida) {
-  const uids = Object.keys(partida.jugadores);
-  const [uidA, uidB] = uids;
-  const vidasA = partida.jugadores[uidA].vidas;
-  const vidasB = partida.jugadores[uidB].vidas;
-
-  const updates = { estado: "finalizada", turnoJuego: null };
-
-  if (vidasA === vidasB) {
-    updates.resultado = "empate";
-  } else {
-    const uidGanador = vidasA > vidasB ? uidA : uidB;
-    updates.resultado = "victoria";
-    updates.ganador = uidGanador;
-  }
-
-  await rtdb.ref(`partidas/${partidaId}`).update(updates);
-  console.log(`[Partida] Finalizada por límite de rondas: ${partidaId}`);
-
-  const partidaActualizada = { ...partida, ...updates };
-  if (updates.resultado === "empate") {
-    await aplicarResultadoCompetitivo(partidaId, partidaActualizada, { tipo: "empate" });
-  } else {
-    await aplicarResultadoCompetitivo(partidaId, partidaActualizada, {
-      tipo: "victoria",
-      ganador: updates.ganador,
-    });
-  }
-}
+exports.rotarMisionesDiarias = require("./misiones").rotarMisionesDiarias;

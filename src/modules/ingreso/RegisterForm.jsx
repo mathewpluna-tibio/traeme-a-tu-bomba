@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { createUserWithEmailAndPassword } from "firebase/auth";
-import { doc, setDoc, getDoc, collection, query, where, getDocs } from "firebase/firestore";
+import { doc, setDoc } from "firebase/firestore";
 import { auth, db } from "../../firebase/config";
 import { httpsCallable } from "firebase/functions";
 import { functions } from "../../firebase/config";
@@ -18,12 +18,6 @@ export default function RegisterForm({ onBack, onSuccess }) {
 
   const validatePassword = (pwd) => PASSWORD_REGEX.test(pwd);
 
-  const isUsernameTaken = async (name) => {
-    const q = query(collection(db, "usuarios"), where("username", "==", name));
-    const snapshot = await getDocs(q);
-    return !snapshot.empty;
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
@@ -37,18 +31,18 @@ export default function RegisterForm({ onBack, onSuccess }) {
     }
 
     setLoading(true);
-    try { 
-      // 1. Verificar username único
+    try {
+      // 1. Verificar username (groserías + unicidad, todo en el servidor)
       const resultado = await validarUsername({ username: username.trim() });
-      if (!resultado.data.valido) {
-        setError("El nombre de usuario contiene palabras no permitidas.");
-        setLoading(false);
-        return;
-      }
 
-      const taken = await isUsernameTaken(username.trim());
-      if (taken) {
-        setError("Ese nombre de usuario ya está en uso.");
+      if (!resultado.data.valido) {
+        if (resultado.data.motivo === "ofensivo") {
+          setError("El nombre de usuario contiene palabras no permitidas.");
+        } else if (resultado.data.motivo === "en_uso") {
+          setError("Ese nombre de usuario ya está en uso.");
+        } else {
+          setError("El nombre de usuario no es válido.");
+        }
         setLoading(false);
         return;
       }
@@ -76,25 +70,25 @@ export default function RegisterForm({ onBack, onSuccess }) {
             vidasPerdidas: 0,
             partidasSinPerderVida: 0,
           },
-        venenosas: {
-          elo: 0,
-          rango: "Cadetes Bomberos",
-          victorias: 0,
-          derrotas: 0,
-          vidasPerdidas: 0,
-          partidasSinPerderVida: 0,
+          venenosas: {
+            elo: 0,
+            rango: "Cadetes Bomberos",
+            victorias: 0,
+            derrotas: 0,
+            vidasPerdidas: 0,
+            partidasSinPerderVida: 0,
+          },
+          elementales: {
+            elo: 0,
+            rango: "Cadetes Bomberos",
+            victorias: 0,
+            derrotas: 0,
+            empates: 0,
+            casillasMarcadas: 0,
+            bombasHieloUsadas: 0,
+          },
         },
-        elementales: {
-          elo: 0,
-          rango: "Cadetes Bomberos",
-          victorias: 0,
-          derrotas: 0,
-          empates: 0,
-          casillasMarcadas: 0,
-          bombasHieloUsadas: 0,
-        },
-      },
-    });
+      });
 
       onSuccess();
     } catch (err) {

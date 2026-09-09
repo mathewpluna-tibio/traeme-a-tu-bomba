@@ -22,10 +22,12 @@ export const db = getFirestore(app);
 export const rtdb = getDatabase(app);
 export const functions = getFunctions(app);
 
-if (import.meta.env.DEV) {
-  connectFunctionsEmulator(functions, "localhost", 5001);
-  connectDatabaseEmulator(rtdb, "localhost", 9000);
+if (import.meta.env.DEV && import.meta.env.VITE_USE_EMULATORS === "true") {
   connectAuthEmulator(auth, "http://localhost:9099");
   connectFirestoreEmulator(db, "localhost", 8080);
+  connectDatabaseEmulator(rtdb, "localhost", 9000);
+  connectFunctionsEmulator(functions, "localhost", 5001);
   console.log("🔧 Conectado a emuladores locales de Firebase");
+} else {
+  console.log("🌐 Conectado a Firebase real (producción)");
 }

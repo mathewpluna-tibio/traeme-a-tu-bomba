@@ -1,0 +1,34 @@
+{
+  "rules": {
+    "colaEspera": {
+      "$modalidad": {
+        "$uid": {
+          ".read": "auth != null && auth.uid == $uid",
+          ".write": "auth != null && auth.uid == $uid"
+        }
+      }
+    },
+    "notificacionesPartida": {
+      "$uid": {
+        ".read": "auth != null && auth.uid == $uid",
+        ".write": "auth != null && auth.uid == $uid"
+      }
+    },
+    "partidas": {
+      "$partidaId": {
+        ".read": "auth != null",
+        ".write": false
+      }
+    },
+    "matchmakingLocks": {
+      ".read": false,
+      ".write": false
+    },
+    "sesionActiva": {
+      "$uid": {
+        ".read": "auth != null && auth.uid == $uid",
+        ".write": "auth != null && auth.uid == $uid"
+      }
+    }
+  }
+}
