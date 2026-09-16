@@ -1,4 +1,4 @@
-import { ref, set, remove } from "firebase/database";
+import { ref, set, remove, update } from "firebase/database";
 import { doc, setDoc, getDoc } from "firebase/firestore";
 import { rtdb, db } from "../../firebase/config";
 
@@ -32,4 +32,8 @@ export async function unirseACola(modalidad, uid, clase, esInvitado) {
 
 export async function salirDeCola(modalidad, uid) {
   await remove(ref(rtdb, `colaEspera/${modalidad}/${uid}`));
+}
+
+export async function refrescarEnCola(modalidad, uid) {
+  await update(ref(rtdb, `colaEspera/${modalidad}/${uid}`), { ultimoPing: Date.now() });
 }

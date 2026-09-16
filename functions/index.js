@@ -15,6 +15,10 @@ const { aplicarResultadoCompetitivo } = require("./competitivo");
 const { duracionTurnoJuego } = require("./turnos");
 const { getFirestore } = require("firebase-admin/firestore");
 const { registrarProgreso } = require("./misiones");
+const { obtenerCantidadBombasVenenosas } = require("./bombas");
+const { onValueWritten } = require("firebase-functions/v2/database");
+const { getDatabase } = require("firebase-admin/database");
+const { initializeApp, getApps } = require("firebase-admin/app");
 
 //FILTRO MALAS PALABRAS
 
@@ -98,11 +102,11 @@ exports.validarUsername = onCall(async (request) => {
   return { valido: true };
 });
 
+exports.limpiarInvitadosViejos = require("./mantenimiento").limpiarInvitadosViejos;
+
 //TRIGGER MATCHMAKING - RECIBE CADA VEZ QUE CAMBIA LA COLA
 
-const { onValueWritten } = require("firebase-functions/v2/database");
-const { getDatabase } = require("firebase-admin/database");
-const { initializeApp, getApps } = require("firebase-admin/app");
+
 
 if (!getApps().length) {
   initializeApp();
@@ -244,8 +248,18 @@ const candidatosValidos = candidatos.filter((c) => {
     const partidaRef = rtdb.ref("partidas").push();
     const partidaId = partidaRef.key;
 
-    const claseJugador = resolverClase(jugador.clase);
-    const claseRival = resolverClase(rival.clase);
+    const esVenenosas = modalidad === "venenosas";
+    const claseJugador = esVenenosas ? null : resolverClase(jugador.clase);
+    const claseRival = esVenenosas ? null : resolverClase(rival.clase);
+
+    const bombasIniciales = esVenenosas
+      ? obtenerCantidadBombasVenenosas(1)
+      : obtenerCantidadBombas(claseJugador, 1);
+    const bombasIncialesRival = esVenenosas
+      ? obtenerCantidadBombasVenenosas(1)
+      : obtenerCantidadBombas(claseRival, 1)
+
+      console.log(`[Matchmaking] esVenenosas=${esVenenosas}, bombasIniciales=${bombasIniciales}, bombasIncialesRival=${bombasIncialesRival}`);
 
     const updates = {};
     updates[`colaEspera/${modalidad}/${uid}`] = null;
@@ -263,7 +277,8 @@ const candidatosValidos = candidatos.filter((c) => {
           listo: false,
           esInvitado: jugador.esInvitado === true,
           eloInicial: jugador.elo ?? 0,
-          bombasDisponibles: obtenerCantidadBombas(claseJugador, 1),
+          bombasDisponibles: bombasIniciales,
+          cargasVeneno: [],
         },
         [rival.uid]: {
           vidas: 3,
@@ -271,7 +286,8 @@ const candidatosValidos = candidatos.filter((c) => {
           listo: false,
           esInvitado: rival.esInvitado === true,
           eloInicial: rival.elo ?? 0,
-          bombasDisponibles: obtenerCantidadBombas(claseRival, 1),
+          bombasDisponibles: bombasIncialesRival,
+          cargasVeneno: [],
         },
       },
       creadaEn: ahora,
@@ -406,8 +422,8 @@ exports.colocarBomba = onCall(async (request) => {
 
   const nuevaBomba = {
     uid,
-    tipo: jugador.clase,
-    dano: obtenerDanoBomba(jugador.clase),
+    tipo: jugador.clase || "veneno",
+    dano: jugador.clase ? obtenerDanoBomba(jugador.clase) : 0,
     colocadaEn: Date.now(),
   };
 
@@ -428,6 +444,60 @@ exports.colocarBomba = onCall(async (request) => {
   }
 
   return { exito: true, bombasRestantes: jugador.bombasDisponibles - 1 };
+});
+
+exports.tickVeneno = onCall(async (request) => {
+  const uid = request.auth?.uid;
+  if (!uid) throw new HttpsError("unauthenticated", "Debes iniciar sesión.");
+
+  const { partidaId } = request.data || {};
+  if (!partidaId) throw new HttpsError("invalid-argument", "Falta el ID de partida.");
+
+  const partidaSnap = await rtdb.ref(`partidas/${partidaId}`).once("value");
+  const partida = partidaSnap.val();
+
+  if (!partida || partida.estado !== "en_curso" || partida.modalidad !== "venenosas") {
+    return { aplicado: false };
+  }
+  if (!partida.jugadores?.[uid]) {
+    throw new HttpsError("permission-denied", "No perteneces a esta partida.");
+  }
+
+  const TICK_MS = 10000;
+  const ahora = Date.now();
+  const jugador = partida.jugadores[uid];
+  const cargas = jugador.cargasVeneno || [];
+
+  if (cargas.length === 0) return { aplicado: false };
+
+  let dañoTotal = 0;
+  const cargasActualizadas = cargas.map((carga) => {
+    const intervalosTranscurridos = Math.floor((ahora - carga.ultimoTick) / TICK_MS);
+    if (intervalosTranscurridos > 0) {
+      dañoTotal += intervalosTranscurridos * 0.25;
+      return { ...carga, ultimoTick: carga.ultimoTick + intervalosTranscurridos * TICK_MS };
+    }
+    return carga;
+  });
+
+  if (dañoTotal === 0) return { aplicado: false };
+
+  const vidasNuevas = Math.max(0, jugador.vidas - dañoTotal);
+
+  await rtdb.ref(`partidas/${partidaId}/jugadores/${uid}`).update({
+    vidas: vidasNuevas,
+    cargasVeneno: cargasActualizadas,
+  });
+
+  console.log(`[Veneno] Tick para ${uid}: -${dañoTotal}, vidas=${vidasNuevas}`);
+
+  if (vidasNuevas <= 0) {
+    const uidRival = Object.keys(partida.jugadores).find((id) => id !== uid);
+    await finalizarPartidaPorDerrota(partidaId, uid, uidRival);
+    return { aplicado: true, resultado: "derrota", vidasNuevas };
+  }
+
+  return { aplicado: true, vidasNuevas };
 });
 
 async function avanzarFaseColocacion(partidaId, uidQueTermina) {
@@ -629,10 +699,14 @@ async function iniciarNuevaRonda(partidaId, uidInicial) {
   };
 
   uids.forEach((id) => {
+    const esVenenosas = partida.modalidad === "venenosas";
     const clase = partida.jugadores[id].clase;
-    updates[`jugadores/${id}/bombasDisponibles`] = obtenerCantidadBombas(clase, nuevaRonda);
+    updates[`jugadores/${id}/bombasDisponibles`] = esVenenosas
+      ? obtenerCantidadBombasVenenosas(nuevaRonda)
+      : obtenerCantidadBombas(clase, nuevaRonda);
     updates[`jugadores/${id}/yaColoco`] = false;
     updates[`jugadores/${id}/coloco`] = false;
+    updates[`jugadores/${id}/cargasVeneno`] = [];
   });
 
   await rtdb.ref(`partidas/${partidaId}`).update(updates);
@@ -711,12 +785,51 @@ exports.activarCasilla = onCall(async (request) => {
   if (casilla.segura === true) {
     throw new HttpsError("failed-precondition", "Esa casilla ya está bloqueada.");
   }
+  if (casilla.detonada === true) {
+    throw new HttpsError("failed-precondition", "Esa casilla ya fue detonada.");
+  }
 
   const uids = Object.keys(partida.jugadores);
   const uidRival = uids.find((id) => id !== uid);
   const bombas = casilla.bombas || [];
 
   if (bombas.length > 0) {
+    if (partida.modalidad === "venenosas") {
+    // --- Modo Venenosas: aplica cargas de veneno, NO termina la ronda ---
+      const cantidadCargas = bombas.length;
+      const ahora = Date.now();
+      const dañoInicial = cantidadCargas * 0.25;
+
+      const cargasActuales = partida.jugadores[uid].cargasVeneno || [];
+      const nuevasCargas = [];
+      for (let i = 0; i < cantidadCargas; i++) {
+        nuevasCargas.push({ creadaEn: ahora, ultimoTick: ahora });
+      }
+
+      const vidasActuales = partida.jugadores[uid].vidas;
+      const vidasNuevas = Math.max(0, vidasActuales - dañoInicial);
+
+      const updates = {};
+      updates[`casillas/${casillaClave}/detonada`] = true;
+      updates[`jugadores/${uid}/vidas`] = vidasNuevas;
+      updates[`jugadores/${uid}/cargasVeneno`] = [...cargasActuales, ...nuevasCargas];
+      updates.turnoJuego = {
+        uidActivo: uidRival,
+        inicioEn: Date.now(),
+        finalizaEn: Date.now() + duracionTurnoJuego(partida.ronda),
+      };
+
+      await rtdb.ref(`partidas/${partidaId}`).update(updates);
+      console.log(`[Veneno] ${uid} detonó ${casillaClave}, cargas=${cantidadCargas}, daño inicial=${dañoInicial}, vidas=${vidasNuevas}`);
+
+      if (vidasNuevas <= 0) {
+        await finalizarPartidaPorDerrota(partidaId, uid, uidRival);
+        return { resultado: "derrota", vidasNuevas };
+      }
+
+      return { resultado: "veneno_aplicado", cargas: cantidadCargas, vidasNuevas };
+    }
+
     const danoTotal = bombas.reduce((sum, b) => sum + (b.dano || 0), 0);
     const vidasActuales = partida.jugadores[uid].vidas;
     const vidasNuevas = Math.max(0, vidasActuales - danoTotal);
@@ -743,6 +856,7 @@ exports.activarCasilla = onCall(async (request) => {
     const casillasSinBomba = Object.values(todasLasCasillas).filter(
       (c) => !(c.bombas && c.bombas.length > 0)
     );
+
     const quedanSegurasSinMarcar = casillasSinBomba.some((c) => c.segura !== true);
 
     if (!quedanSegurasSinMarcar) {
@@ -784,7 +898,7 @@ exports.verificarTimeoutJuego = onCall(async (request) => {
   const uidActivo = partida.turnoJuego.uidActivo;
   const uidRival = Object.keys(partida.jugadores).find((id) => id !== uidActivo);
   const vidasActuales = partida.jugadores[uidActivo].vidas;
-  const vidasNuevas = Math.max(0, vidasActuales - 1); 
+  const vidasNuevas = Math.max(0, vidasActuales - 1); // RQF-GAM-09: pierde 1 vida
 
   await rtdb.ref(`partidas/${partidaId}/jugadores/${uidActivo}/vidas`).set(vidasNuevas);
   console.log(`[Juego] Timeout de ${uidActivo}, pierde 1 vida, restantes=${vidasNuevas}`);
@@ -794,7 +908,20 @@ exports.verificarTimeoutJuego = onCall(async (request) => {
     return { expirado: true, resultado: "derrota" };
   }
 
- const uidInicioSiguiente = siguienteInicioColocacion("detonacion", uidActivo, uidRival);
+  if (partida.modalidad === "venenosas") {
+    // En Venenosas, el timeout SOLO pasa el turno - la ronda únicamente
+    // avanza al limpiar todas las casillas seguras (RQF-MOD-01/02).
+    await rtdb.ref(`partidas/${partidaId}/turnoJuego`).set({
+      uidActivo: uidRival,
+      inicioEn: Date.now(),
+      finalizaEn: Date.now() + duracionTurnoJuego(partida.ronda),
+    });
+    console.log(`[Veneno] Timeout: turno pasa a ${uidRival}, misma ronda`);
+    return { expirado: true, resultado: "timeout_pasa_turno" };
+  }
+
+  // Estándar: comportamiento original, termina la ronda
+  const uidInicioSiguiente = siguienteInicioColocacion("detonacion", uidActivo, uidRival);
   await iniciarNuevaRonda(partidaId, uidInicioSiguiente);
 
   return { expirado: true, resultado: "timeout" };

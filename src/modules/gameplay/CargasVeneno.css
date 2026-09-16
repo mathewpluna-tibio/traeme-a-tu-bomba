@@ -1,0 +1,30 @@
+.cargas-veneno {
+  padding: 8px 10px;
+  background: rgba(76, 175, 80, 0.15);
+  border-radius: 6px;
+  margin: 8px 0;
+}
+
+.cargas-veneno-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  margin-bottom: 6px;
+}
+
+.cargas-veneno-lista {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.carga-individual {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  background: rgba(76, 175, 80, 0.3);
+  border-radius: 12px;
+  font-size: 12px;
+}

@@ -1,4 +1,5 @@
 import './avatar.css'
+import UserBomb from "../../assets/UserBomb.png";
 
 export default function ProfileHeader({ profile }) {
   return (
@@ -10,7 +11,7 @@ export default function ProfileHeader({ profile }) {
         {/* El marco rodea la imagen; por ahora usamos el id como clase CSS */}
         <div className={`marco ${profile.marcoActivo}`}>
           <img
-            src={profile.fotoPerfil || "/default_avatar.png"}
+            src={profile.fotoPerfil || UserBomb}
             alt="Avatar"
             className="avatar-img"
           />

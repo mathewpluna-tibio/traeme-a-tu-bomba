@@ -21,7 +21,11 @@ export default function Tablero({ casillas = {}, onCasillaClick, deshabilitado, 
         continue;
       }
 
-      const claseEstado = casilla.segura === true ? "casilla-segura" : "casilla-sin-activar";
+      const claseEstado = casilla.segura === true
+        ? "casilla-segura"
+        : casilla.detonada === true
+        ? "casilla-detonada"
+        : "casilla-sin-activar";
       const bombasVisibles = (casilla.bombas || []).filter((b) => bombaEsVisible(b, ahora));
       const tieneAlgoVisible = bombasVisibles.length > 0;
       const enProceso = casillaEnProceso === clave;

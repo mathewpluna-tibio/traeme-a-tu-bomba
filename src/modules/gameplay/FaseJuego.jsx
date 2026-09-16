@@ -2,7 +2,9 @@ import { useState, useEffect } from "react";
 import { httpsCallable } from "firebase/functions";
 import { functions } from "../../firebase/config";
 import { useAuth } from "../../context/AuthContext";
+import { useServerTimeOffset } from "../../hooks/useServerTimeOffset";
 import Tablero from "./Tablero";
+import CargasVeneno from "./CargasVeneno.jsx";
 
 const activarCasillaCallable = httpsCallable(functions, "activarCasilla");
 const verificarTimeoutJuegoCallable = httpsCallable(functions, "verificarTimeoutJuego");
@@ -13,6 +15,8 @@ export default function FaseJuego({ partidaId, partida }) {
   const [error, setError] = useState("");
   const [segundosRestantes, setSegundosRestantes] = useState(null);
   const [casillaEnProceso, setCasillaEnProceso] = useState(null);
+  const tickVenenoCallable = httpsCallable(functions, "tickVeneno");
+  const offset = useServerTimeOffset();
 
   const esMiTurno = partida.turnoJuego?.uidActivo === user.uid;
   const finalizaEn = partida.turnoJuego?.finalizaEn;
@@ -23,7 +27,7 @@ export default function FaseJuego({ partidaId, partida }) {
       return;
     }
     const intervalo = setInterval(() => {
-      const restante = Math.max(0, Math.ceil((finalizaEn - Date.now()) / 1000));
+      const restante = Math.max(0, Math.ceil((finalizaEn - (Date.now() + offset)) / 1000));
       setSegundosRestantes(restante);
       if (restante === 0) {
         verificarTimeoutJuegoCallable({ partidaId }).catch((err) =>
@@ -32,7 +36,19 @@ export default function FaseJuego({ partidaId, partida }) {
       }
     }, 1000);
     return () => clearInterval(intervalo);
-  }, [finalizaEn, partidaId]);
+  }, [finalizaEn, partidaId, offset]);
+
+  useEffect(() => {
+    if (partida.modalidad !== "venenosas") return;
+
+    const intervalo = setInterval(() => {
+      tickVenenoCallable({ partidaId }).catch((err) =>
+        console.error("Error en tick de veneno:", err)
+      );
+    }, 2000); // cada 2s, suficientemente frecuente sin saturar
+
+  return () => clearInterval(intervalo);
+}, [partida.modalidad, partidaId]);
 
   const handleCasillaClick = async (casillaClave) => {
   if (procesando || !esMiTurno) return;
@@ -58,6 +74,10 @@ export default function FaseJuego({ partidaId, partida }) {
     <div className="fase-juego">
       <p>Tus vidas: {"❤️".repeat(Math.ceil(miVida))} ({miVida})</p>
       <p>Vidas del rival: {"❤️".repeat(Math.ceil(vidaRival))} ({vidaRival})</p>
+
+      {partida.modalidad === "venenosas" && (
+        <CargasVeneno cargas={partida.jugadores?.[user.uid]?.cargasVeneno || []} />
+      )}
 
       {esMiTurno ? (
         <p className="turno-activo">

@@ -65,31 +65,37 @@ async function registrarProgreso(uid, tipoEvento, cantidad = 1) {
 
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 
-const rotarMisionesDiarias = onSchedule("every day 00:00", async () => {
-  const firestore = getFirestore();
-  const usuariosSnap = await firestore.collection("usuarios").get();
-  const hoy = new Date().toISOString().split("T")[0];
+const rotarMisionesDiarias = onSchedule(
+  {
+    schedule: "every day 00:00",
+    timeZone: "America/Mexico_City",
+  },
+  async () => {
+    const firestore = getFirestore();
+    const usuariosSnap = await firestore.collection("usuarios").get();
+    const hoy = new Date().toISOString().split("T")[0];
 
-  const batch = firestore.batch();
-  let contador = 0;
+    const batch = firestore.batch();
+    let contador = 0;
 
-  usuariosSnap.forEach((doc) => {
-    const datos = doc.data();
-    if (datos.misionesDiarias?.fecha === hoy) return;
+    usuariosSnap.forEach((doc) => {
+      const datos = doc.data();
+      if (datos.misionesDiarias?.fecha === hoy) return;
 
-    const misionesElegidas = [...MISIONES_DIARIAS]
-      .sort(() => Math.random() - 0.5)
-      .slice(0, 3)
-      .map((m) => ({ ...m, progreso: 0, completada: false }));
+      const misionesElegidas = [...MISIONES_DIARIAS]
+        .sort(() => Math.random() - 0.5)
+        .slice(0, 3)
+        .map((m) => ({ ...m, progreso: 0, completada: false }));
 
-    batch.update(doc.ref, {
-      misionesDiarias: { fecha: hoy, lista: misionesElegidas },
+      batch.update(doc.ref, {
+        misionesDiarias: { fecha: hoy, lista: misionesElegidas },
+      });
+      contador++;
     });
-    contador++;
-  });
 
-  await batch.commit();
-  console.log(`[Misiones] Rotación diaria completada para ${contador} usuarios.`);
-});
+    await batch.commit();
+    console.log(`[Misiones] Rotación diaria completada para ${contador} usuarios.`);
+  }
+);
 
 module.exports = { registrarProgreso, rotarMisionesDiarias };

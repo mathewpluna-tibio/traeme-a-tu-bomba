@@ -1,6 +1,6 @@
 // src/hooks/useSesionUnica.js
 import { useEffect } from "react";
-import { ref, onDisconnect, set, onValue } from "firebase/database";
+import { ref, onDisconnect, set, onValue,remove } from "firebase/database";
 import { rtdb } from "../firebase/config";
 import { useAuth } from "../context/AuthContext";
 
@@ -10,7 +10,7 @@ export function useSesionUnica() {
   useEffect(() => {
     if (!user) return;
 
-    const sesionId = crypto.randomUUID();
+    const sesionId = `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
     const sesionRef = ref(rtdb, `sesionActiva/${user.uid}`);
 
     set(sesionRef, sesionId);
@@ -23,6 +23,9 @@ export function useSesionUnica() {
       }
     });
 
-    return unsubscribe;
+    return () => {
+      unsubscribe();
+      remove(sesionRef).catch(() => {});
+    };
   }, [user]);
 }

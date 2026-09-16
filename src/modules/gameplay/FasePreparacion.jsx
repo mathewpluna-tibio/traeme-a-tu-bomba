@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { httpsCallable } from "firebase/functions";
 import { functions } from "../../firebase/config";
 import { useAuth } from "../../context/AuthContext";
+import { useServerTimeOffset } from "../../hooks/useServerTimeOffset";
 import Tablero from "./Tablero";
 
 const colocarBombaCallable = httpsCallable(functions, "colocarBomba");
@@ -16,35 +17,13 @@ export default function FasePreparacion({ partidaId, partida }) {
   const [error, setError] = useState("");
   const [segundosRestantes, setSegundosRestantes] = useState(null);
   const yaFinalizoTurno = useRef(false);
+  const offset = useServerTimeOffset();
 
   const miInfo = partida.jugadores?.[user.uid];
   const bombasRestantes = miInfo?.bombasDisponibles ?? 0;
   const esMiTurno = partida.turnoColocacion?.uidActivo === user.uid;
   console.log("[FasePreparacion] uidActivo:", partida.turnoColocacion?.uidActivo, "| mi uid:", user.uid, "| esMiTurno:", esMiTurno, "| bombasRestantes:", bombasRestantes);
   const finalizaEn = partida.turnoColocacion?.finalizaEn;
-
-  // Cuenta regresiva visual + verificación de timeout cada segundo
-  useEffect(() => {
-    if (!finalizaEn) {
-      setSegundosRestantes(null);
-      return;
-    }
-
-    const intervalo = setInterval(() => {
-      const restante = Math.max(0, Math.ceil((finalizaEn - Date.now()) / 1000));
-      setSegundosRestantes(restante);
-
-      if (restante === 0) {
-        // Cualquiera de los dos jugadores puede "avisar" al servidor;
-        // el servidor decide con su propio reloj si de verdad expiró.
-        verificarTimeoutCallable({ partidaId }).catch((err) =>
-          console.error("Error verificando timeout:", err)
-        );
-      }
-    }, 1000);
-
-    return () => clearInterval(intervalo);
-  }, [finalizaEn, partidaId]);
 
   // Cierre voluntario al agotar bombas (código existente, sin cambios)
   useEffect(() => {
@@ -62,24 +41,24 @@ export default function FasePreparacion({ partidaId, partida }) {
   }, [esMiTurno]);
 
   useEffect(() => {
-  if (!finalizaEn || !esMiTurno) {
-    setSegundosRestantes(null);
-    return;
-  }
-
-  const intervalo = setInterval(() => {
-    const restante = Math.max(0, Math.ceil((finalizaEn - Date.now()) / 1000));
-    setSegundosRestantes(restante);
-
-    if (restante === 0 && esMiTurno) {
-      verificarTimeoutCallable({ partidaId }).catch((err) =>
-        console.error("Error verificando timeout:", err)
-      );
+    if (!finalizaEn || !esMiTurno) {
+      setSegundosRestantes(null);
+      return;
     }
-  }, 1000);
 
-  return () => clearInterval(intervalo);
-}, [finalizaEn, partidaId, esMiTurno]);
+    const intervalo = setInterval(() => {
+      const restante = Math.max(0, Math.ceil((finalizaEn - (Date.now() + offset)) / 1000));
+      setSegundosRestantes(restante);
+
+      if (restante === 0 && esMiTurno) {
+        verificarTimeoutCallable({ partidaId }).catch((err) =>
+          console.error("Error verificando timeout:", err)
+        );
+      }
+    }, 1000);
+
+    return () => clearInterval(intervalo);
+  }, [finalizaEn, partidaId, esMiTurno, offset]);
 
   const handleCasillaClick = async (casillaClave) => {
     if (colocando || !esMiTurno) return;

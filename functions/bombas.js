@@ -13,14 +13,20 @@ const CONFIG_BOMBAS = {
   },
 };
 
+const CANTIDAD_BOMBAS_VENENOSAS = { 1: 5, 2: 8, 3: 11, default: 14 };
+
 function obtenerCantidadBombas(clase, ronda) {
   const config = CONFIG_BOMBAS[clase];
   if (!config) return 0;
   return config.cantidad[ronda] ?? config.cantidad.default;
 }
 
+function obtenerCantidadBombasVenenosas(ronda) {
+  return CANTIDAD_BOMBAS_VENENOSAS[ronda] ?? CANTIDAD_BOMBAS_VENENOSAS.default;
+}
+
 function obtenerDanoBomba(clase) {
   return CONFIG_BOMBAS[clase]?.dano ?? 0;
 }
 
-module.exports = { CONFIG_BOMBAS, obtenerCantidadBombas, obtenerDanoBomba };
+module.exports = { CONFIG_BOMBAS, obtenerCantidadBombas, obtenerDanoBomba, obtenerCantidadBombasVenenosas };

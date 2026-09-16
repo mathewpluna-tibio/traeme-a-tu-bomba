@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { onAuthStateChanged, signInAnonymously,signOut} from "firebase/auth";
-import { auth } from "../firebase/config";
+import { auth, rtdb } from "../firebase/config";
+import { ref, remove } from "firebase/database";
 
 const AuthContext = createContext(null);
 
@@ -23,6 +24,9 @@ export function AuthProvider({ children }) {
   };
 
   const cerrarSesion = async () => {
+    if (auth.currentUser) {
+      await remove(ref(rtdb, `sesionActiva/${auth.currentUser.uid}`));
+    }
     await signOut(auth);
   };
 

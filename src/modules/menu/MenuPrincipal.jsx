@@ -4,13 +4,14 @@ import { doc, setDoc, getDoc } from "firebase/firestore";
 import { db } from "../../firebase/config";
 import { useAuth } from "../../context/AuthContext";
 import { useUserProfile } from "../../hooks/useUserProfile";
-import { unirseACola, salirDeCola } from "./matchmaking";
+import { unirseACola, salirDeCola, refrescarEnCola } from "./matchmaking";
 import { useNotificacionPartida } from "../../hooks/useNotificacionPartida";
 import { menuMachine } from "./menuMachine";
 import SeleccionModalidad from "./SeleccionModalidad";
 import SeleccionClase from "./SeleccionClase";
 import PartidaScreen from "../gameplay/PartidaScreen";
 import logo from "../../assets/Logo_TATomba.png";
+import UserBomb from "../../assets/UserBomb.png"
 import "./MenuPrincipal.css";
 import "./GameMenu.css";
 
@@ -169,7 +170,7 @@ export default function MenuPrincipal({ onIrAPerfil, onIrARankings, onIrAMisione
           <div className="gm-profile-card" onClick={onIrAPerfil} style={{ cursor: "pointer" }}>
             <img
               className="gm-profile-avatar"
-              src={profile?.fotoPerfil || logo}
+              src={profile?.fotoPerfil || UserBomb}
               alt={`Avatar de ${profile?.username || "jugador"}`}
             />
             <div className="gm-profile-info">
