@@ -1,0 +1,245 @@
+/* ===================== PANTALLA DE INGRESO ===================== */
+/* Diseño adaptado del GameMenu.jsx/GameMenu.css del equipo (tarjeta de
+   autenticación con vistas welcome / login / register). Se usa como
+   pantalla completa (no como overlay oscurecido) mientras no hay sesión,
+   por eso trae sus propias variables --gm-* en vez de depender de que
+   .gm-app ya esté montado. */
+
+.ingreso-panel {
+  --gm-bg-dark: #0f1015;
+  --gm-orange: #ff7a1a;
+  --gm-orange-2: #ff9633;
+  --gm-text-light: #f4f4f8;
+  --gm-text-muted: #9a9aab;
+  --gm-font-display: "Baloo 2", sans-serif;
+  --gm-font-body: "Nunito", sans-serif;
+
+  min-height: 100vh;
+  width: 100%;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  background: linear-gradient(160deg, #241c66 0%, #4a37c2 45%, #7c5be0 100%);
+  font-family: var(--gm-font-body);
+}
+
+.ingreso-panel * {
+  box-sizing: border-box;
+}
+
+.ingreso-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 32px;
+  width: 100%;
+  max-width: 440px;
+  transition: gap 0.3s ease;
+}
+
+.gm-game-logo {
+  width: 100%;
+  max-width: 420px;
+  height: auto;
+  object-fit: contain;
+  filter: drop-shadow(0 12px 24px rgba(0, 0, 0, 0.35));
+  transition: max-width 0.3s ease, margin 0.3s ease;
+}
+
+/* Cuando el login está abierto, el logo se encoge y sube para dar espacio */
+.ingreso-content.gm-login-open .gm-game-logo {
+  max-width: 220px;
+  margin-top: -8px;
+}
+
+.gm-login-trigger {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.55);
+  font-family: var(--gm-font-body);
+  font-size: 13px;
+  cursor: pointer;
+  margin-top: -16px;
+}
+
+.gm-login-trigger:hover {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+/* --- Ventana de login --- */
+.gm-login-card {
+  position: relative;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 16px;
+  padding: 28px;
+  border-radius: 20px;
+  background: linear-gradient(180deg, #3b2f9e 0%, #6a55d6 55%, #8fc7ef 100%);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+}
+
+.gm-login-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  font-size: 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+}
+
+.gm-login-close:hover {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+/* --- Vistas dentro de la tarjeta (welcome / login / register) --- */
+.gm-auth-view {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  position: relative;
+}
+
+.gm-auth-back {
+  position: absolute;
+  top: -4px;
+  left: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.gm-auth-back:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.gm-login-title {
+  text-align: center;
+  color: #fff;
+  font-family: var(--gm-font-display);
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.gm-login-subtitle {
+  text-align: center;
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 13px;
+  margin-top: -8px;
+}
+
+.gm-login-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 16px 20px;
+  border-radius: 12px;
+  border: none;
+  font-family: var(--gm-font-body);
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  transition: filter 0.12s ease, transform 0.12s ease;
+}
+
+.gm-login-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.gm-login-btn:hover {
+  filter: brightness(1.06);
+}
+
+.gm-login-btn:active {
+  transform: scale(0.98);
+}
+
+.gm-login-btn--email {
+  background: #e0522f;
+  color: #fff;
+}
+
+.gm-login-btn--guest {
+  background: linear-gradient(180deg, var(--gm-orange-2), var(--gm-orange));
+  color: #fff;
+}
+
+.gm-login-btn--secondary {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+}
+
+.gm-login-btn-icon {
+  font-size: 15px;
+  display: flex;
+  align-items: center;
+}
+
+/* --- Formularios (Iniciar sesión / Crear cuenta) --- */
+.gm-auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.gm-auth-input {
+  padding: 14px 16px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  font-family: var(--gm-font-body);
+  font-size: 14px;
+}
+
+.gm-auth-input::placeholder {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.gm-auth-input:focus {
+  outline: none;
+  border-color: #fff;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.gm-auth-hint {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.65);
+  margin-top: -4px;
+}
+
+.gm-auth-error {
+  font-size: 12px;
+  color: #ffb3b3;
+}
+
+@media (max-width: 480px) {
+  .ingreso-panel {
+    padding: 24px 12px;
+  }
+
+  .gm-login-card {
+    padding: 20px;
+  }
+}

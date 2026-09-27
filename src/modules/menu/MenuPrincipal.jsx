@@ -10,13 +10,16 @@ import { menuMachine } from "./menuMachine";
 import SeleccionModalidad from "./SeleccionModalidad";
 import SeleccionClase from "./SeleccionClase";
 import PartidaScreen from "../gameplay/PartidaScreen";
+import RankingsPage from "../rankings/RankingsPage";
+import PerfilPage from "../perfil/PerfilPage";
+import MisionesPage from "../misiones/MisionesPage";
 import logo from "../../assets/Logo_TATomba.png";
 import UserBomb from "../../assets/UserBomb.png"
 import "./MenuPrincipal.css";
 import "./GameMenu.css";
 
 const NAV_ITEMS = [
-  { id: "buscar", label: "Buscar", icon: "🔍" },
+  { id: "buscar", label: "Jugar", icon: "🎮" },
   { id: "tienda", label: "Tienda", icon: "🛒" },
   { id: "inventario", label: "Inventario", icon: "📦" },
   { id: "ranking", label: "Ranking", icon: "🏆" },
@@ -24,12 +27,15 @@ const NAV_ITEMS = [
   { id: "evento", label: "Evento", icon: "📅" },
 ];
 
-export default function MenuPrincipal({ onIrAPerfil, onIrARankings, onIrAMisiones }) {
+export default function MenuPrincipal() {
   const { user, cerrarSesion } = useAuth();
   const { profile } = useUserProfile();
   const { partidaId, limpiarNotificacion } = useNotificacionPartida();
   const [state, send] = useMachine(menuMachine);
   const [navActivo, setNavActivo] = useState("buscar");
+
+  const [pantallaActiva, setPantallaActiva] = useState("jugar");
+  const [perfilUidObjetivo, setPerfilUidObjetivo] = useState(null);
 
   useEffect(() => {
     if (partidaId) {
@@ -92,13 +98,25 @@ export default function MenuPrincipal({ onIrAPerfil, onIrARankings, onIrAMisione
     send({ type: "JUGAR_DE_NUEVO", modalidad: ultimaModalidad });
   };
 
+ const volverAJugar = () => {
+  setPantallaActiva("jugar");
+  setNavActivo("buscar");
+  };
+
+  const irAPerfilDe = (uid) => {
+    setPerfilUidObjetivo(uid);
+    setPantallaActiva("perfil");
+  };
+
   const manejarNav = (id) => {
     setNavActivo(id);
-  if (id === "ranking") {
-    onIrARankings();
-  } else if (id === "logros") {
-    onIrAMisiones();
-  }
+    if (id === "buscar") {
+      setPantallaActiva("jugar");
+    } else if (id === "ranking") {
+      setPantallaActiva("ranking");
+    } else if (id === "logros") {
+      setPantallaActiva("misiones");
+    }
   };
 
   if (state.matches("en_partida")) {
@@ -144,46 +162,55 @@ export default function MenuPrincipal({ onIrAPerfil, onIrARankings, onIrAMisione
   }));
 
   return (
-    <div className="gm-app">
-      {/* ===================== SIDEBAR IZQUIERDA ===================== */}
-      <aside className="gm-sidebar gm-sidebar--left">
-        <nav className="gm-nav">
-          {NAV_ITEMS.map((item) => (
-            <button
-              key={item.id}
-              className={"gm-nav-item" + (item.id === navActivo ? " gm-nav-item--active" : "")}
-              onClick={() => manejarNav(item.id)}
-            >
-              <span className="gm-nav-icon">{item.icon}</span>
-              <span>{item.label}</span>
-            </button>
-          ))}
-        </nav>
+  <div className="gm-app">
+    {/* ===================== SIDEBAR IZQUIERDA (siempre visible) ===================== */}
+    <aside className="gm-sidebar gm-sidebar--left">
+      <nav className="gm-nav">
+        {NAV_ITEMS.map((item) => (
+          <button
+            key={item.id}
+            className={
+              "gm-nav-item" +
+              (item.id === navActivo ? " gm-nav-item--active" : "") +
+              (item.id === "buscar" ? " gm-nav-item--jugar" : "")
+            }
+            onClick={() => manejarNav(item.id)}
+          >
+            <span className="gm-nav-icon">{item.icon}</span>
+            <span>{item.label}</span>
+          </button>
+        ))}
+      </nav>
 
-        <div className="gm-sidebar-footer">
-          <div className="gm-footer-icons">
-            <button className="gm-icon-btn" aria-label="Configuración">⚙️</button>
-            <button className="gm-icon-btn" aria-label="Ayuda">❓</button>
-            <button className="gm-icon-btn" aria-label="Notificaciones">🔔</button>
-          </div>
+      <div className="gm-sidebar-footer">
+        <div className="gm-footer-icons">
+          <button className="gm-icon-btn" aria-label="Configuración">⚙️</button>
+          <button className="gm-icon-btn" aria-label="Ayuda">❓</button>
+          <button className="gm-icon-btn" aria-label="Notificaciones">🔔</button>
+        </div>
 
-          <div className="gm-profile-card" onClick={onIrAPerfil} style={{ cursor: "pointer" }}>
-            <img
-              className="gm-profile-avatar"
-              src={profile?.fotoPerfil || UserBomb}
-              alt={`Avatar de ${profile?.username || "jugador"}`}
-            />
-            <div className="gm-profile-info">
-              <span className="gm-profile-name">{profile?.username || user?.email}</span>
-              <span className="gm-profile-level">
-                {profile?.estadisticas?.estandar?.rango || "Cadetes Bomberos"}
-              </span>
-            </div>
+        <div
+          className="gm-profile-card"
+          onClick={() => { setPerfilUidObjetivo(null); setPantallaActiva("perfil"); }}
+          style={{ cursor: "pointer" }}
+        >
+          <img
+            className="gm-profile-avatar"
+            src={profile?.fotoPerfil || UserBomb}
+            alt={`Avatar de ${profile?.username || "jugador"}`}
+          />
+          <div className="gm-profile-info">
+            <span className="gm-profile-name">{profile?.username || user?.email}</span>
+            <span className="gm-profile-level">
+              {profile?.estadisticas?.estandar?.rango || "Cadetes Bomberos"}
+            </span>
           </div>
         </div>
-      </aside>
+      </div>
+    </aside>
 
-      {/* ===================== PANEL CENTRAL ===================== */}
+    {/* ===================== CONTENIDO CENTRAL (cambia según pantallaActiva) ===================== */}
+    {pantallaActiva === "jugar" && (
       <main className="gm-main-panel">
         <div className="gm-main-content">
           <img className="gm-game-logo" src={logo} alt="Traeme a tu bomba" />
@@ -204,52 +231,71 @@ export default function MenuPrincipal({ onIrAPerfil, onIrARankings, onIrAMisione
           </button>
         </div>
       </main>
+    )}
 
-      {/* ===================== SIDEBAR DERECHA ===================== */}
-      <aside className="gm-sidebar gm-sidebar--right">
-        <section className="gm-panel">
-          <header className="gm-panel-header">
-            <h2 className="gm-panel-title">
-              <span className="gm-panel-icon">🎯</span>
-              Misiones diarias
-            </h2>
-            <span className="gm-panel-timer">🕐 --</span>
-          </header>
+    {pantallaActiva === "ranking" && (
+      <div className="gm-content-full">
+        <RankingsPage onVolver={volverAJugar} onVerPerfil={irAPerfilDe} />
+      </div>
+    )}
 
-          <ul className="gm-mission-list">
-            {misiones.length === 0 && <li className="gm-mission">Sin misiones disponibles aún.</li>}
-            {misiones.map((mission) => (
-              <li className="gm-mission" key={mission.id}>
-                <span className="gm-mission-icon">{mission.icon}</span>
-                <div className="gm-mission-info">
-                  <span className="gm-mission-title">{mission.title}</span>
-                  <span className="gm-mission-subtitle">Misión Diaria</span>
-                </div>
-                <span className="gm-mission-progress">{mission.progress}</span>
-              </li>
-            ))}
-          </ul>
-        </section>
+    {pantallaActiva === "perfil" && (
+      <div className="gm-content-full">
+        <PerfilPage onVolver={volverAJugar} uidObjetivo={perfilUidObjetivo} />
+      </div>
+    )}
 
-        <section className="gm-panel">
-          <header className="gm-panel-header">
-            <h2 className="gm-panel-title">
-              <span className="gm-panel-icon">📅</span>
-              Evento especial
-            </h2>
-          </header>
+    {pantallaActiva === "misiones" && (
+      <div className="gm-content-full">
+        <MisionesPage onVolver={volverAJugar} />
+      </div>
+    )}
 
-          <div className="gm-empty-event">
-            <span className="gm-empty-event-icon">🗓️</span>
-            <p className="gm-empty-event-title">No existe un evento activo</p>
-            <p className="gm-empty-event-text">
-              No existe un evento en este momento.
-              <br />
-              ¡Vuelve más tarde para unirte al caos de las bombas!
-            </p>
-          </div>
-        </section>
-      </aside>
-    </div>
-  );
+    {/* ===================== SIDEBAR DERECHA (siempre visible, en toda vista) ===================== */}
+    <aside className="gm-sidebar gm-sidebar--right">
+      <section className="gm-panel">
+        <header className="gm-panel-header">
+          <h2 className="gm-panel-title">
+            <span className="gm-panel-icon">🎯</span>
+            Misiones diarias
+          </h2>
+          <span className="gm-panel-timer">🕐 --</span>
+        </header>
+
+        <ul className="gm-mission-list">
+          {misiones.length === 0 && <li className="gm-mission">Sin misiones disponibles aún.</li>}
+          {misiones.map((mission) => (
+            <li className="gm-mission" key={mission.id}>
+              <span className="gm-mission-icon">{mission.icon}</span>
+              <div className="gm-mission-info">
+                <span className="gm-mission-title">{mission.title}</span>
+                <span className="gm-mission-subtitle">Misión Diaria</span>
+              </div>
+              <span className="gm-mission-progress">{mission.progress}</span>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      <section className="gm-panel">
+        <header className="gm-panel-header">
+          <h2 className="gm-panel-title">
+            <span className="gm-panel-icon">📅</span>
+            Evento especial
+          </h2>
+        </header>
+
+        <div className="gm-empty-event">
+          <span className="gm-empty-event-icon">🗓️</span>
+          <p className="gm-empty-event-title">No existe un evento activo</p>
+          <p className="gm-empty-event-text">
+            No existe un evento en este momento.
+            <br />
+            ¡Vuelve más tarde para unirte al caos de las bombas!
+          </p>
+        </div>
+      </section>
+    </aside>
+  </div>
+);
 }

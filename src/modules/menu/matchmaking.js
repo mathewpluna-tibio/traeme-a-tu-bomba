@@ -21,13 +21,15 @@ export async function unirseACola(modalidad, uid, clase, esInvitado) {
     timestamp: Date.now(),
   });
 
-  if (clase && !esInvitado) {
+  if (!esInvitado) {
     await setDoc(
       doc(db, "preferencias", uid),
-      { ultimaModalidad: modalidad, ultimaClase: clase },
+      { ultimaModalidad: modalidad, ultimaClase: clase || null},
       { merge: true }
     );
   }
+
+
 }
 
 export async function salirDeCola(modalidad, uid) {

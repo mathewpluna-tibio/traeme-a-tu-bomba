@@ -9,33 +9,24 @@ import MisionesPage from "./modules/misiones/MisionesPage";
 
 function App() {
   const { user, loading } = useAuth();
-  const [showWelcome, setShowWelcome] = useState(true);
-  const [vista, setVista] = useState("jugar"); // "jugar" | "perfil" | "rankings" | "misiones"
+  const [vista, setVista] = useState("jugar"); // "jugar" | "perfil" | "rankings"
 
   useSesionUnica();
 
   if (loading) return <p>Cargando...</p>;
 
-  const volverAlMenu = () => setVista("jugar");
-
   return (
     <>
-      {!user && showWelcome && (
-        <WelcomeModal onClose={() => setShowWelcome(false)} />
-      )}
+      {/* RQF-ING-01: sin sesión (ni siquiera invitado), no hay forma de llegar
+          a los botones de juego — WelcomeModal ya no se puede cerrar sin
+          autenticarse, solo desaparece cuando `user` deja de ser null. */}
+      {!user && <WelcomeModal />}
 
       {user && (
         <>
-          {vista === "jugar" && (
-            <MenuPrincipal
-              onIrAPerfil={() => setVista("perfil")}
-              onIrARankings={() => setVista("rankings")}
-              onIrAMisiones={() => setVista("misiones")}
-            />
-          )}
-          {vista === "perfil" && <PerfilPage onVolver={volverAlMenu} />}
-          {vista === "rankings" && <RankingsPage onVolver={volverAlMenu} />}
-          {vista === "misiones" && <MisionesPage onVolver={volverAlMenu} />}
+          {vista === "jugar" && <MenuPrincipal />}
+          {vista === "perfil" && <PerfilPage />}
+          {vista === "rankings" && <RankingsPage />}
         </>
       )}
     </>

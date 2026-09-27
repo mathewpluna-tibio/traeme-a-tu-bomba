@@ -39,32 +39,36 @@ export default function LoginForm({ onBack, onSuccess }) {
   };
 
   return (
-    <form onSubmit={handleSubmit}>
-      <h3>Iniciar Sesión</h3>
-
-      <input
-        type="email"
-        placeholder="Correo electrónico"
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-        required
-      />
-      <input
-        type="password"
-        placeholder="Contraseña"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-        required
-      />
-
-      {error && <p className="error-text">{error}</p>}
-
-      <button type="submit" disabled={loading}>
-        {loading ? "Ingresando..." : "Iniciar Sesión"}
+    <div className="gm-auth-view">
+      <button className="gm-auth-back" onClick={onBack} aria-label="Volver">
+        ←
       </button>
-      <button type="button" onClick={onBack}>
-        Volver
-      </button>
-    </form>
+      <h2 className="gm-login-title">Iniciar sesión</h2>
+
+      <form className="gm-auth-form" onSubmit={handleSubmit}>
+        <input
+          className="gm-auth-input"
+          type="email"
+          placeholder="Correo electrónico"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          required
+        />
+        <input
+          className="gm-auth-input"
+          type="password"
+          placeholder="Contraseña"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          required
+        />
+
+        {error && <p className="gm-auth-error">{error}</p>}
+
+        <button type="submit" className="gm-login-btn gm-login-btn--email" disabled={loading}>
+          {loading ? "Ingresando..." : "Iniciar sesión"}
+        </button>
+      </form>
+    </div>
   );
 }

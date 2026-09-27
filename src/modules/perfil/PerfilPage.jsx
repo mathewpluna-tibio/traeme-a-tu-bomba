@@ -10,8 +10,8 @@ const MODALIDADES = [
   { key: "elementales", label: "Bombas Elementales" },
 ];
 
-export default function PerfilPage({ onVolver }) {
-  const { profile, loading } = useUserProfile();
+export default function PerfilPage({ onVolver, uidObjetivo }) {
+  const { profile, loading } = useUserProfile(uidObjetivo);
   const [modalidad, setModalidad] = useState("general");
 
   if (loading) return <p>Cargando perfil...</p>;

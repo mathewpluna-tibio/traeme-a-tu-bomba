@@ -1,47 +1,130 @@
+@import url("https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Nunito:wght@600;700;800&display=swap");
+
 .rankings-page {
-  padding: 20px;
-  max-width: 600px;
+  --rk-bg-dark: #0f1015;
+  --rk-card-dark: #1c1d27;
+  --rk-orange: #ff7a1a;
+  --rk-orange-2: #ff9633;
+  --rk-gold: #ffd166;
+  --rk-text-light: #f4f4f8;
+  --rk-text-muted: #9a9aab;
+  --rk-border-soft: rgba(255, 255, 255, 0.06);
+  --rk-font-display: "Baloo 2", sans-serif;
+  --rk-font-body: "Nunito", sans-serif;
+
+  max-width: 900px;
   margin: 0 auto;
+  padding: 20px 20px 60px;
+  background: var(--rk-bg-dark);
+  color: var(--rk-text-light);
+  font-family: var(--rk-font-body);
+  border-radius: 16px;
 }
 
-.rankings-tabs-modalidad,
-.rankings-tabs-categoria {
-  display: flex;
-  gap: 8px;
-  margin: 12px 0;
-  flex-wrap: wrap;
-}
+.rankings-page * { box-sizing: border-box; }
 
-.rankings-tabs-modalidad button,
-.rankings-tabs-categoria button {
-  padding: 8px 14px;
-  border: 1px solid #ccc;
-  background: #f5f5f5;
+.rk-back {
+  background: none;
+  border: none;
+  color: var(--rk-text-muted);
   cursor: pointer;
-  border-radius: 4px;
+  margin-bottom: 12px;
+  font-family: var(--rk-font-body);
+  font-size: 14px;
+}
+.rk-back:hover { color: var(--rk-text-light); }
+
+.rk-header { display: flex; flex-direction: column; gap: 14px; margin-bottom: 20px; }
+
+.rk-title {
+  display: flex; align-items: center; gap: 10px;
+  color:#fff; 
+  font-family: var(--rk-font-display); font-size: 24px; font-weight: 700;
+}
+.rk-title-icon { font-size: 22px; }
+
+.rk-mode-tabs, .rk-category-tabs { display: flex; gap: 8px; flex-wrap: wrap; }
+
+.rk-mode-tab, .rk-category-tab {
+  border: 1px solid var(--rk-border-soft);
+  background: var(--rk-card-dark);
+  color: var(--rk-text-muted);
+  font-family: var(--rk-font-body);
+  font-weight: 700;
+  font-size: 13px;
+  padding: 10px 16px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.rk-mode-tab:hover, .rk-category-tab:hover { color: var(--rk-text-light); }
+
+.rk-mode-tab--active, .rk-category-tab--active {
+  background: linear-gradient(180deg, var(--rk-orange-2), var(--rk-orange));
+  color: #fff;
+  border-color: transparent;
 }
 
-.rankings-tabs-modalidad button.activo,
-.rankings-tabs-categoria button.activo {
-  background: #ff8c00;
-  color: white;
-  border-color: #ff8c00;
+.rk-category-tab { font-size: 12px; padding: 7px 12px; }
+
+.rk-status { padding: 20px; color: var(--rk-text-muted); }
+.rk-status--error { color: #ff6b6b; }
+
+.rk-table {
+  background: var(--rk-card-dark);
+  border: 1px solid var(--rk-border-soft);
+  border-radius: 16px;
+  overflow: hidden;
 }
 
-.rankings-tabla {
+.rk-table-head {
+  display: grid;
+  grid-template-columns: 56px 1fr 220px 100px;
+  padding: 14px 20px;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--rk-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  border-bottom: 1px solid var(--rk-border-soft);
+}
+
+.rk-list { max-height: 560px; overflow-y: auto; }
+
+.rk-row {
   width: 100%;
-  border-collapse: collapse;
-  margin-top: 16px;
-}
-
-.rankings-tabla th,
-.rankings-tabla td {
-  padding: 8px 12px;
+  display: grid;
+  grid-template-columns: 56px 1fr 220px 100px;
+  align-items: center;
+  padding: 12px 20px;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--rk-border-soft);
+  color: var(--rk-text-light);
+  cursor: pointer;
   text-align: left;
-  border-bottom: 1px solid #eee;
+  font-family: var(--rk-font-body);
+  transition: background 0.12s ease;
 }
+.rk-row:last-child { border-bottom: none; }
+.rk-row:hover { background: rgba(255, 255, 255, 0.04); }
+.rk-row--top { background: rgba(255, 150, 51, 0.06); }
 
-.rankings-tabla tr:first-child td {
-  font-weight: bold;
-  color: #ff8c00;
+.rk-col { display: flex; align-items: center; }
+.rk-col-pos { font-weight: 800; }
+.rk-pos-number { color: var(--rk-text-muted); font-size: 14px; }
+.rk-medal { font-size: 18px; }
+
+.rk-col-player { gap: 10px; min-width: 0; }
+.rk-avatar { width: 34px; height: 34px; border-radius: 50%; object-fit: cover; background: #333; flex-shrink: 0; }
+.rk-name { font-weight: 800; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.rk-col-tier { font-size: 12px; color: var(--rk-text-muted); }
+.rk-tier-badge { display: flex; align-items: center; gap: 6px; }
+
+.rk-col-stat { font-weight: 800; font-size: 15px; color: var(--rk-gold); justify-content: flex-end; }
+
+@media (max-width: 640px) {
+  .rk-table-head, .rk-row { grid-template-columns: 40px 1fr 90px; }
+  .rk-col-tier { display: none; }
 }

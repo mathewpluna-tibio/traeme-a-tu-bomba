@@ -295,6 +295,22 @@
   transition: transform 0.12s ease, filter 0.12s ease;
 }
 
+.gm-content-full {
+  flex: 1;
+  padding: 24px;
+  overflow-y: auto;
+}
+
+.gm-sidebar .gm-nav-item.gm-nav-item--jugar {
+  background: linear-gradient(180deg, #ff9633, #ff7a1a) !important;
+  color: #fff !important;
+  border-radius: 10px;
+}
+
+.gm-sidebar .gm-nav-item.gm-nav-item--jugar:hover {
+  filter: brightness(1.05);
+}
+
 .gm-btn:hover {
   filter: brightness(1.08);
 }

@@ -25,7 +25,7 @@ export default function SeleccionClase({ tipoAccion, modalidad, onConfirmar, onC
     console.log("Clase confirmada:", claseId, "Modalidad:", modalidad, "Acción:", tipoAccion);
 
     if (tipoAccion === "buscar") {
-      await unirseACola(modalidad, user.uid, claseId);
+      await unirseACola(modalidad, user.uid, claseId, user.isAnonymous);
     } else {
       // RQF-MEN-05: generar enlace de invitación irrepetible (pendiente)
       console.log("Creando lobby privado...");
