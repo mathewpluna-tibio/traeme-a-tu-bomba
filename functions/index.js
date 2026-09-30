@@ -1,4 +1,3 @@
-
 const {setGlobalOptions} = require("firebase-functions");
 const {onRequest} = require("firebase-functions/https");
 const logger = require("firebase-functions/logger");
@@ -16,6 +15,23 @@ const { duracionTurnoJuego } = require("./turnos");
 const { getFirestore } = require("firebase-admin/firestore");
 const { registrarProgreso } = require("./misiones");
 const { obtenerCantidadBombasVenenosas } = require("./bombas");
+const {
+  generarCasillasElementales,
+  casillasPropiasDisponibles,
+  marcarCasillaPropia,
+  aplicarBombaElectrica,
+  aplicarBombaLianas,
+  aplicarBombaHielo,
+  partidaTerminada: partidaElementalTerminada,
+  resolverGanadorPorCasillas,
+  otroJugador: otroJugadorElemental,
+  ANCHO_TABLERO: ANCHO_TABLERO_ELEMENTAL,
+  ALTO_TABLERO: ALTO_TABLERO_ELEMENTAL,
+} = require("./elementales");
+
+// Timer de turno fijo confirmado para Bombas Elementales (una sola ronda,
+// no hay progresión de rondas como en Estándar/Venenosas).
+const DURACION_TURNO_ELEMENTAL_MS = 7000;
 const { onValueWritten } = require("firebase-functions/v2/database");
 const { getDatabase } = require("firebase-admin/database");
 const { initializeApp, getApps } = require("firebase-admin/app");
@@ -249,49 +265,99 @@ const candidatosValidos = candidatos.filter((c) => {
     const partidaId = partidaRef.key;
 
     const esVenenosas = modalidad === "venenosas";
-    const claseJugador = esVenenosas ? null : resolverClase(jugador.clase);
-    const claseRival = esVenenosas ? null : resolverClase(rival.clase);
+    const esElementales = modalidad === "elementales";
+    const claseJugador = (esVenenosas || esElementales) ? null : resolverClase(jugador.clase);
+    const claseRival = (esVenenosas || esElementales) ? null : resolverClase(rival.clase);
 
     const bombasIniciales = esVenenosas
       ? obtenerCantidadBombasVenenosas(1)
-      : obtenerCantidadBombas(claseJugador, 1);
+      : esElementales
+        ? null
+        : obtenerCantidadBombas(claseJugador, 1);
     const bombasIncialesRival = esVenenosas
       ? obtenerCantidadBombasVenenosas(1)
-      : obtenerCantidadBombas(claseRival, 1)
+      : esElementales
+        ? null
+        : obtenerCantidadBombas(claseRival, 1)
 
-      console.log(`[Matchmaking] esVenenosas=${esVenenosas}, bombasIniciales=${bombasIniciales}, bombasIncialesRival=${bombasIncialesRival}`);
+      console.log(`[Matchmaking] esVenenosas=${esVenenosas}, esElementales=${esElementales}, bombasIniciales=${bombasIniciales}, bombasIncialesRival=${bombasIncialesRival}`);
 
     const updates = {};
     updates[`colaEspera/${modalidad}/${uid}`] = null;
     updates[`colaEspera/${modalidad}/${rival.uid}`] = null;
-    updates[`partidas/${partidaId}`] = {
-      modalidad,
-      tipo: "matchmaking",
-      tablero: null,
-      ronda: 1,
-      estado: "generando_tablero",
-      jugadores: {
-        [uid]: {
-          vidas: 3,
-          clase: claseJugador,
-          listo: false,
-          esInvitado: jugador.esInvitado === true,
-          eloInicial: jugador.elo ?? 0,
-          bombasDisponibles: bombasIniciales,
-          cargasVeneno: [],
+
+    if (esElementales) {
+      // Elementales no tiene selección de tablero al azar ni rondas: el
+      // tablero es fijo (el rectángulo más grande) y la partida arranca
+      // "en_curso" de inmediato, sin pasar por "generando_tablero".
+      const indiceAzul = Math.floor(Math.random() * 2);
+      const uidAzul = indiceAzul === 0 ? uid : rival.uid;
+      const uidRojo = indiceAzul === 0 ? rival.uid : uid;
+      const datosPorUid = { [uid]: jugador, [rival.uid]: rival };
+
+      updates[`partidas/${partidaId}`] = {
+        modalidad,
+        tipo: "matchmaking",
+        estado: "en_curso",
+        anchoTablero: ANCHO_TABLERO_ELEMENTAL,
+        altoTablero: ALTO_TABLERO_ELEMENTAL,
+        casillas: generarCasillasElementales(),
+        numeroTurno: 1,
+        jugadores: {
+          [uidAzul]: {
+            color: "azul",
+            esInvitado: datosPorUid[uidAzul].esInvitado === true,
+            eloInicial: datosPorUid[uidAzul].elo ?? 0,
+            casillasMarcadas: 0,
+            bombas: { electrica: true, lianas: true, hielo: true },
+            congeladoPorTurnos: 0,
+          },
+          [uidRojo]: {
+            color: "rojo",
+            esInvitado: datosPorUid[uidRojo].esInvitado === true,
+            eloInicial: datosPorUid[uidRojo].elo ?? 0,
+            casillasMarcadas: 0,
+            bombas: { electrica: true, lianas: true, hielo: true },
+            congeladoPorTurnos: 0,
+          },
         },
-        [rival.uid]: {
-          vidas: 3,
-          clase: claseRival,
-          listo: false,
-          esInvitado: rival.esInvitado === true,
-          eloInicial: rival.elo ?? 0,
-          bombasDisponibles: bombasIncialesRival,
-          cargasVeneno: [],
+        turnoActual: {
+          uidActivo: uidAzul,
+          inicioEn: ahora,
+          finalizaEn: ahora + DURACION_TURNO_ELEMENTAL_MS,
         },
-      },
-      creadaEn: ahora,
-    };
+        creadaEn: ahora,
+      };
+    } else {
+      updates[`partidas/${partidaId}`] = {
+        modalidad,
+        tipo: "matchmaking",
+        tablero: null,
+        ronda: 1,
+        estado: "generando_tablero",
+        jugadores: {
+          [uid]: {
+            vidas: 3,
+            clase: claseJugador,
+            listo: false,
+            esInvitado: jugador.esInvitado === true,
+            eloInicial: jugador.elo ?? 0,
+            bombasDisponibles: bombasIniciales,
+            cargasVeneno: [],
+          },
+          [rival.uid]: {
+            vidas: 3,
+            clase: claseRival,
+            listo: false,
+            esInvitado: rival.esInvitado === true,
+            eloInicial: rival.elo ?? 0,
+            bombasDisponibles: bombasIncialesRival,
+            cargasVeneno: [],
+          },
+        },
+        creadaEn: ahora,
+      };
+    }
     updates[`notificacionesPartida/${uid}`] = partidaId;
     updates[`notificacionesPartida/${rival.uid}`] = partidaId;
 
@@ -928,3 +994,184 @@ exports.verificarTimeoutJuego = onCall(async (request) => {
 });
 
 exports.rotarMisionesDiarias = require("./misiones").rotarMisionesDiarias;
+
+// ============================================================
+// BOMBAS ELEMENTALES (Modo Extra: juego de territorio, sin vidas)
+// ============================================================
+
+/** Avanza el turno tras una jugada válida en Elementales: revisa si la
+ * partida terminó, salta el turno de cualquier jugador congelado, y arma
+ * el siguiente `turnoActual` con el timer fijo de 7s. */
+async function avanzarTurnoElemental(partidaId, uidPropuesto) {
+  const partidaSnap = await rtdb.ref(`partidas/${partidaId}`).once("value");
+  const partida = partidaSnap.val();
+  if (!partida || partida.estado !== "en_curso") return;
+
+  if (partidaElementalTerminada(partida)) {
+    await finalizarPartidaElemental(partidaId, partida);
+    return;
+  }
+
+  let siguienteUid = uidPropuesto;
+  let numeroTurno = (partida.numeroTurno || 1) + 1;
+  const actualizaciones = {};
+
+  // Si el siguiente jugador está congelado (Bomba de Hielo), se le salta
+  // el turno automáticamente.
+  let vueltas = 0;
+  while ((partida.jugadores[siguienteUid]?.congeladoPorTurnos || 0) > 0 && vueltas < 4) {
+    actualizaciones[`jugadores/${siguienteUid}/congeladoPorTurnos`] =
+      partida.jugadores[siguienteUid].congeladoPorTurnos - 1;
+    partida.jugadores[siguienteUid].congeladoPorTurnos -= 1;
+    siguienteUid = otroJugadorElemental(siguienteUid, partida);
+    numeroTurno += 1;
+    vueltas += 1;
+  }
+
+  actualizaciones.numeroTurno = numeroTurno;
+  actualizaciones.turnoActual = {
+    uidActivo: siguienteUid,
+    inicioEn: Date.now(),
+    finalizaEn: Date.now() + DURACION_TURNO_ELEMENTAL_MS,
+  };
+
+  await rtdb.ref(`partidas/${partidaId}`).update(actualizaciones);
+}
+
+async function finalizarPartidaElemental(partidaId, partida) {
+  const resultado = resolverGanadorPorCasillas(partida);
+  await rtdb.ref(`partidas/${partidaId}`).update({
+    estado: "finalizada",
+    turnoActual: null,
+    resultado: resultado.empate ? "empate" : "victoria",
+    ganador: resultado.empate ? null : resultado.ganador,
+  });
+  console.log(`[Elementales] Partida ${partidaId} finalizada. ${resultado.empate ? "Empate" : `Gana ${resultado.ganador}`}`);
+
+  const partidaActualizada = { ...partida, estado: "finalizada" };
+  if (resultado.empate) {
+    await aplicarResultadoCompetitivo(partidaId, partidaActualizada, { tipo: "empate" });
+  } else {
+    await aplicarResultadoCompetitivo(partidaId, partidaActualizada, {
+      tipo: "victoria",
+      ganador: resultado.ganador,
+    });
+  }
+}
+
+exports.marcarCasillaElemental = onCall(async (request) => {
+  const uid = request.auth?.uid;
+  if (!uid) throw new HttpsError("unauthenticated", "Debes iniciar sesión.");
+
+  const { partidaId, casillaClave } = request.data || {};
+  if (!partidaId || !casillaClave) {
+    throw new HttpsError("invalid-argument", "Faltan datos.");
+  }
+
+  const partidaSnap = await rtdb.ref(`partidas/${partidaId}`).once("value");
+  const partida = partidaSnap.val();
+
+  if (!partida || partida.modalidad !== "elementales") {
+    throw new HttpsError("failed-precondition", "Esta partida no es de Bombas Elementales.");
+  }
+  if (partida.estado !== "en_curso") {
+    throw new HttpsError("failed-precondition", "La partida no está en curso.");
+  }
+  if (partida.turnoActual?.uidActivo !== uid) {
+    throw new HttpsError("failed-precondition", "No es tu turno.");
+  }
+  if (!partida.jugadores?.[uid]) {
+    throw new HttpsError("permission-denied", "No perteneces a esta partida.");
+  }
+
+  if (!casillasPropiasDisponibles(uid, partida).includes(casillaClave)) {
+    throw new HttpsError("invalid-argument", "Esa casilla no es un movimiento válido.");
+  }
+
+  const actualizaciones = marcarCasillaPropia(casillaClave, uid, partida);
+  await rtdb.ref(`partidas/${partidaId}`).update(actualizaciones);
+  await registrarProgreso(uid, "casilla_marcada_elemental", 1);
+
+  await avanzarTurnoElemental(partidaId, otroJugadorElemental(uid, partida));
+  return { exito: true };
+});
+
+exports.usarBombaElemental = onCall(async (request) => {
+  const uid = request.auth?.uid;
+  if (!uid) throw new HttpsError("unauthenticated", "Debes iniciar sesión.");
+
+  const { partidaId, tipoBomba, casillaObjetivo, casillasBloqueo } = request.data || {};
+  if (!partidaId || !tipoBomba || !casillaObjetivo) {
+    throw new HttpsError("invalid-argument", "Faltan datos.");
+  }
+  if (!["electrica", "lianas", "hielo"].includes(tipoBomba)) {
+    throw new HttpsError("invalid-argument", "Tipo de bomba inválido.");
+  }
+
+  const partidaSnap = await rtdb.ref(`partidas/${partidaId}`).once("value");
+  const partida = partidaSnap.val();
+
+  if (!partida || partida.modalidad !== "elementales") {
+    throw new HttpsError("failed-precondition", "Esta partida no es de Bombas Elementales.");
+  }
+  if (partida.estado !== "en_curso") {
+    throw new HttpsError("failed-precondition", "La partida no está en curso.");
+  }
+  if (partida.turnoActual?.uidActivo !== uid) {
+    throw new HttpsError("failed-precondition", "No es tu turno.");
+  }
+  const jugador = partida.jugadores?.[uid];
+  if (!jugador) throw new HttpsError("permission-denied", "No perteneces a esta partida.");
+  if (!jugador.bombas?.[tipoBomba]) {
+    throw new HttpsError("failed-precondition", "Ya usaste esa bomba.");
+  }
+
+  let actualizaciones;
+  try {
+    if (tipoBomba === "electrica") {
+      actualizaciones = aplicarBombaElectrica(casillaObjetivo, uid, partida);
+    } else if (tipoBomba === "lianas") {
+      actualizaciones = aplicarBombaLianas(casillaObjetivo, casillasBloqueo, uid, partida);
+    } else {
+      actualizaciones = aplicarBombaHielo(casillaObjetivo, uid, partida);
+    }
+  } catch (err) {
+    throw new HttpsError("invalid-argument", err.message);
+  }
+
+  await rtdb.ref(`partidas/${partidaId}`).update(actualizaciones);
+  await registrarProgreso(uid, "bomba_elemental_usada", 1);
+  if (tipoBomba === "hielo") {
+    await registrarProgreso(uid, "bomba_hielo_usada", 1);
+  }
+
+  await avanzarTurnoElemental(partidaId, otroJugadorElemental(uid, partida));
+  return { exito: true };
+});
+
+exports.verificarTimeoutTurnoElemental = onCall(async (request) => {
+  const uid = request.auth?.uid;
+  if (!uid) throw new HttpsError("unauthenticated", "Debes iniciar sesión.");
+
+  const { partidaId } = request.data || {};
+  if (!partidaId) throw new HttpsError("invalid-argument", "Falta el ID de partida.");
+
+  const partidaSnap = await rtdb.ref(`partidas/${partidaId}`).once("value");
+  const partida = partidaSnap.val();
+
+  if (!partida || partida.modalidad !== "elementales" || partida.estado !== "en_curso") {
+    return { expirado: false };
+  }
+  if (!partida.jugadores?.[uid]) {
+    throw new HttpsError("permission-denied", "No perteneces a esta partida.");
+  }
+
+  const finalizaEn = partida.turnoActual?.finalizaEn;
+  if (!finalizaEn || Date.now() < finalizaEn) return { expirado: false };
+
+  const uidActivo = partida.turnoActual.uidActivo;
+  // Se le acabó el tiempo: pierde el turno sin marcar nada (confirmado).
+  await avanzarTurnoElemental(partidaId, otroJugadorElemental(uidActivo, partida));
+
+  return { expirado: true, resultado: "turno_perdido" };
+});

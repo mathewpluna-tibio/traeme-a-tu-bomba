@@ -99,3 +99,149 @@
 @keyframes girar {
   to { transform: rotate(360deg); }
 }
+
+/* ============================================================
+   Bombas Elementales
+   ============================================================ */
+
+.fase-juego-elemental {
+  max-width: 620px;
+  margin: 0 auto;
+}
+
+.elemental-marcador {
+  display: flex;
+  justify-content: center;
+  gap: 24px;
+  font-size: 18px;
+  font-weight: bold;
+  margin-bottom: 8px;
+}
+
+.elemental-marcador-color {
+  padding: 4px 10px;
+  border-radius: 6px;
+  color: white;
+}
+
+.elemental-marcador-azul {
+  background: #1e88e5;
+}
+
+.elemental-marcador-rojo {
+  background: #e53935;
+}
+
+.elemental-instruccion {
+  font-style: italic;
+  color: #555;
+  min-height: 1.2em;
+}
+
+.elemental-inventarios {
+  display: flex;
+  justify-content: center;
+  gap: 32px;
+  margin: 16px 0;
+  flex-wrap: wrap;
+}
+
+.elemental-inventario-titulo {
+  font-weight: bold;
+  margin-bottom: 6px;
+}
+
+.elemental-bombas {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.elemental-bomba-btn {
+  padding: 8px 12px;
+  border: 2px solid #999;
+  border-radius: 6px;
+  background: #fff;
+  cursor: pointer;
+}
+
+.elemental-bomba-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.elemental-bomba-armada {
+  border-color: #f9a825;
+  background: #fff8e1;
+}
+
+.elemental-bomba-usada {
+  text-decoration: line-through;
+  opacity: 0.4;
+}
+
+.elemental-bomba-rival {
+  padding: 8px 12px;
+  border: 2px dashed #bbb;
+  border-radius: 6px;
+  color: #555;
+}
+
+.elemental-acciones-modo {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.elemental-cancelar {
+  background: #eee;
+}
+
+.tablero-elemental-grid {
+  max-width: 600px;
+  margin: 12px auto;
+}
+
+.casilla-elemental {
+  width: 100%;
+  aspect-ratio: 1;
+  border: 1px solid #999;
+  background: #f0f0f0;
+  cursor: default;
+}
+
+.casilla-elemental-hueco {
+  background: transparent;
+  border: none;
+}
+
+.casilla-elemental-azul {
+  background: #1e88e5;
+}
+
+.casilla-elemental-rojo {
+  background: #e53935;
+}
+
+.casilla-elemental-bloqueada {
+  background: repeating-linear-gradient(45deg, #c5e1a5, #c5e1a5 6px, #aed581 6px, #aed581 12px);
+}
+
+.casilla-elemental-jugable {
+  cursor: pointer;
+  box-shadow: inset 0 0 0 3px #fdd835;
+}
+
+.casilla-elemental-jugable:hover {
+  filter: brightness(1.1);
+}
+
+.casilla-elemental-seleccionada {
+  box-shadow: inset 0 0 0 3px #6a1b9a;
+}
+
+.icono-elemental {
+  font-size: 14px;
+}

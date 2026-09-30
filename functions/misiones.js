@@ -14,6 +14,8 @@ async function registrarProgreso(uid, tipoEvento, cantidad = 1) {
   const actualizaciones = {};
   let coronasGanadas = 0;
   const titulosNuevos = [];
+  const marcosNuevos = [];
+  const bannersNuevos = [];
 
   // --- Misiones diarias ---
   const misionesActualizadas = misionesActivas.map((m) => {
@@ -28,25 +30,32 @@ async function registrarProgreso(uid, tipoEvento, cantidad = 1) {
   }
 
   // --- Logros permanentes ---
-  const logroRelevante = LOGROS.find((l) => l.tipo === tipoEvento);
-  if (logroRelevante) {
-    const yaDesbloqueado = progresoLogros[logroRelevante.id]?.desbloqueado === true;
-    if (!yaDesbloqueado) {
-      const progresoActual = progresoLogros[logroRelevante.id]?.progreso || 0;
-      const nuevoProgreso = Math.min(logroRelevante.objetivo, progresoActual + cantidad);
-      const desbloqueadoAhora = nuevoProgreso >= logroRelevante.objetivo;
+  // OJO: antes era `LOGROS.find(...)`, que solo dejaba avanzar al PRIMER
+  // logro de ese `tipo` en el arreglo. En cuanto hay más de un logro que
+  // comparte el mismo `tipo` (p. ej. varios que cuentan "victoria"), los
+  // demás dejaban de recibir progreso para siempre en cuanto el primero
+  // se desbloqueaba, sin ningún error visible. Con 13 logros varios van a
+  // compartir `tipo`, así que ahora se recorren TODOS los que apliquen.
+  const logrosRelevantes = LOGROS.filter((l) => l.tipo === tipoEvento);
 
-      actualizaciones[`progresoLogros.${logroRelevante.id}`] = {
-        progreso: nuevoProgreso,
-        desbloqueado: desbloqueadoAhora,
-      };
+  for (const logro of logrosRelevantes) {
+    const yaDesbloqueado = progresoLogros[logro.id]?.desbloqueado === true;
+    if (yaDesbloqueado) continue;
 
-      if (desbloqueadoAhora) {
-        coronasGanadas += logroRelevante.recompensaCoronas;
-        if (logroRelevante.tituloDesbloqueado) {
-          titulosNuevos.push(logroRelevante.tituloDesbloqueado);
-        }
-      }
+    const progresoActual = progresoLogros[logro.id]?.progreso || 0;
+    const nuevoProgreso = Math.min(logro.objetivo, progresoActual + cantidad);
+    const desbloqueadoAhora = nuevoProgreso >= logro.objetivo;
+
+    actualizaciones[`progresoLogros.${logro.id}`] = {
+      progreso: nuevoProgreso,
+      desbloqueado: desbloqueadoAhora,
+    };
+
+    if (desbloqueadoAhora) {
+      if (logro.recompensaCoronas) coronasGanadas += logro.recompensaCoronas;
+      if (logro.tituloDesbloqueado) titulosNuevos.push(logro.tituloDesbloqueado);
+      if (logro.marcoDesbloqueado) marcosNuevos.push(logro.marcoDesbloqueado);
+      if (logro.bannerDesbloqueado) bannersNuevos.push(logro.bannerDesbloqueado);
     }
   }
 
@@ -55,6 +64,12 @@ async function registrarProgreso(uid, tipoEvento, cantidad = 1) {
   }
   if (titulosNuevos.length > 0) {
     actualizaciones.titulosObtenidos = FieldValue.arrayUnion(...titulosNuevos);
+  }
+  if (marcosNuevos.length > 0) {
+    actualizaciones.marcosComprados = FieldValue.arrayUnion(...marcosNuevos);
+  }
+  if (bannersNuevos.length > 0) {
+    actualizaciones.bannersComprados = FieldValue.arrayUnion(...bannersNuevos);
   }
 
   if (Object.keys(actualizaciones).length > 0) {

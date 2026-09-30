@@ -1,6 +1,6 @@
 const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 const { determinarRango, calcularPuntosVictoria } = require("./elo");
-const { registrarProgreso } = require("./misiones");
+const { registrarProgreso, establecerProgresoRacha } = require("./misiones");
 
 async function aplicarResultadoCompetitivo(partidaId, partida, resultado) {
   const uids = Object.keys(partida.jugadores);
@@ -16,24 +16,28 @@ async function aplicarResultadoCompetitivo(partidaId, partida, resultado) {
   }
 
   const modalidad = partida.modalidad;
+  const esElementales = modalidad === "elementales";
 
-  // RQF-COM-04: vidas perdidas/quitadas/conservadas se calculan SIEMPRE,
-  // sin importar si el resultado fue victoria o empate.
-  const vidasA = jugadorA.vidas;
-  const vidasB = jugadorB.vidas;
-  const vidasPerdidasA = 3 - vidasA;
-  const vidasPerdidasB = 3 - vidasB;
-
-  const statsBaseA = {
-    vidasPerdidas: vidasPerdidasA,
-    vidasConservadas: vidasA,
-    vidasQuitadas: vidasPerdidasB,
-  };
-  const statsBaseB = {
-    vidasPerdidas: vidasPerdidasB,
-    vidasConservadas: vidasB,
-    vidasQuitadas: vidasPerdidasA,
-  };
+  const statsBaseA = esElementales
+    ? {
+        casillasMarcadas: jugadorA.casillasMarcadas || 0,
+        bombaHieloUsada: jugadorA.bombas?.hielo === false,
+      }
+    : {
+        vidasPerdidas: 3 - jugadorA.vidas,
+        vidasConservadas: jugadorA.vidas,
+        vidasQuitadas: 3 - jugadorB.vidas,
+      };
+  const statsBaseB = esElementales
+    ? {
+        casillasMarcadas: jugadorB.casillasMarcadas || 0,
+        bombaHieloUsada: jugadorB.bombas?.hielo === false,
+      }
+    : {
+        vidasPerdidas: 3 - jugadorB.vidas,
+        vidasConservadas: jugadorB.vidas,
+        vidasQuitadas: 3 - jugadorA.vidas,
+      };
 
   if (resultado.tipo === "victoria") {
     const uidGanador = resultado.ganador;
@@ -64,23 +68,38 @@ async function aplicarResultadoCompetitivo(partidaId, partida, resultado) {
     ]);
 
     await registrarProgreso(uidGanador, "victoria", 1);
-    if (modalidad === "estandar") {
-      await registrarProgreso(uidGanador, "partida_jugada_estandar", 1);
-      await registrarProgreso(uidPerdedor, "partida_jugada_estandar", 1);
+    await registrarProgreso(uidGanador, `partida_jugada_${modalidad}`, 1);
+    await registrarProgreso(uidPerdedor, `partida_jugada_${modalidad}`, 1);
+
+    if (esElementales) {
+      await registrarProgreso(uidGanador, "victoria_elementales", 1);
     }
-    if (jugadorA.vidas === 3 || jugadorB.vidas === 3) {
+
+    if (!esElementales && (jugadorA.vidas === 3 || jugadorB.vidas === 3)) {
       const vidasFinalesGanador = partida.jugadores[uidGanador].vidas;
       if (vidasFinalesGanador === 3) {
         await registrarProgreso(uidGanador, "victoria_sin_perder_vida", 1);
       }
     }
 
+    if (!esElementales) {
+      const vidasFinalesGanador = partida.jugadores[uidGanador].vidas;
+      await actualizarRachaSinPerderVida(uidGanador, vidasFinalesGanador === 3);
+      await actualizarRachaSinPerderVida(uidPerdedor, false);
+    }
+
+    await actualizarRachaVictorias(uidGanador, true);
+    await actualizarRachaVictorias(uidPerdedor, false);
   } else if (resultado.tipo === "empate") {
     const eloA = jugadorA.eloInicial;
     const eloB = jugadorB.eloInicial;
 
     let nuevoEloA, nuevoEloB;
-    if (eloA === eloB) {
+    if (esElementales) {
+      // RQF del Modo Extra: Bombas Elementales - un empate reparte 15/15
+      nuevoEloA = eloA + 15;
+      nuevoEloB = eloB + 15;
+    } else if (eloA === eloB) {
       nuevoEloA = eloA + 10;
       nuevoEloB = eloB + 10;
     } else if (eloA > eloB) {
@@ -92,10 +111,55 @@ async function aplicarResultadoCompetitivo(partidaId, partida, resultado) {
     }
 
     await Promise.all([
-      actualizarPerfilTrasPartida(uidA, modalidad, { elo: nuevoEloA, ...statsBaseA }),
-      actualizarPerfilTrasPartida(uidB, modalidad, { elo: nuevoEloB, ...statsBaseB }),
+      actualizarPerfilTrasPartida(uidA, modalidad, {
+        elo: nuevoEloA,
+        esEmpate: esElementales,
+        ...statsBaseA,
+      }),
+      actualizarPerfilTrasPartida(uidB, modalidad, {
+        elo: nuevoEloB,
+        esEmpate: esElementales,
+        ...statsBaseB,
+      }),
     ]);
+
+    await registrarProgreso(uidA, `partida_jugada_${modalidad}`, 1);
+    await registrarProgreso(uidB, `partida_jugada_${modalidad}`, 1);
+
+    if (!esElementales) {
+      await actualizarRachaSinPerderVida(uidA, false);
+      await actualizarRachaSinPerderVida(uidB, false);
+    }
+
+    await actualizarRachaVictorias(uidA, false);
+    await actualizarRachaVictorias(uidB, false);
   }
+}
+
+async function actualizarRachaSinPerderVida(uid, siguioLaRacha) {
+  const firestore = getFirestore();
+  const perfilRef = firestore.collection("usuarios").doc(uid);
+  const perfilSnap = await perfilRef.get();
+  if (!perfilSnap.exists) return;
+
+  const rachaActual = perfilSnap.data().rachaVictoriasSinPerderVida || 0;
+  const nuevaRacha = siguioLaRacha ? rachaActual + 1 : 0;
+
+  await perfilRef.update({ rachaVictoriasSinPerderVida: nuevaRacha });
+  await establecerProgresoRacha(uid, "racha_victoria_sin_perder_vida", nuevaRacha);
+}
+
+async function actualizarRachaVictorias(uid, gano) {
+  const firestore = getFirestore();
+  const perfilRef = firestore.collection("usuarios").doc(uid);
+  const perfilSnap = await perfilRef.get();
+  if (!perfilSnap.exists) return;
+
+  const rachaActual = perfilSnap.data().rachaVictorias || 0;
+  const nuevaRacha = gano ? rachaActual + 1 : 0;
+
+  await perfilRef.update({ rachaVictorias: nuevaRacha });
+  await establecerProgresoRacha(uid, "racha_victorias", nuevaRacha);
 }
 
 async function actualizarPerfilTrasPartida(uid, modalidad, datos) {
@@ -105,14 +169,28 @@ async function actualizarPerfilTrasPartida(uid, modalidad, datos) {
   if (!perfilSnap.exists) return;
 
   const nuevoRango = determinarRango(datos.elo);
+  const esElementales = modalidad === "elementales";
 
   const actualizaciones = {
     [`estadisticas.${modalidad}.elo`]: datos.elo,
     [`estadisticas.${modalidad}.rango`]: nuevoRango,
-    [`estadisticas.${modalidad}.vidasPerdidas`]: FieldValue.increment(datos.vidasPerdidas || 0),
-    [`estadisticas.${modalidad}.vidasQuitadas`]: FieldValue.increment(datos.vidasQuitadas || 0),
-    [`estadisticas.${modalidad}.vidasConservadas`]: FieldValue.increment(datos.vidasConservadas || 0),
   };
+
+  if (esElementales) {
+    actualizaciones[`estadisticas.${modalidad}.casillasMarcadas`] = FieldValue.increment(
+      datos.casillasMarcadas || 0
+    );
+    if (datos.bombaHieloUsada) {
+      actualizaciones[`estadisticas.${modalidad}.bombasHieloUsadas`] = FieldValue.increment(1);
+    }
+    if (datos.esEmpate) {
+      actualizaciones[`estadisticas.${modalidad}.empates`] = FieldValue.increment(1);
+    }
+  } else {
+    actualizaciones[`estadisticas.${modalidad}.vidasPerdidas`] = FieldValue.increment(datos.vidasPerdidas || 0);
+    actualizaciones[`estadisticas.${modalidad}.vidasQuitadas`] = FieldValue.increment(datos.vidasQuitadas || 0);
+    actualizaciones[`estadisticas.${modalidad}.vidasConservadas`] = FieldValue.increment(datos.vidasConservadas || 0);
+  }
 
   if (datos.esVictoria !== undefined) {
     actualizaciones[`estadisticas.${modalidad}.victorias`] = FieldValue.increment(
@@ -121,7 +199,7 @@ async function actualizarPerfilTrasPartida(uid, modalidad, datos) {
     actualizaciones[`estadisticas.${modalidad}.derrotas`] = FieldValue.increment(
       datos.esVictoria ? 0 : 1
     );
-    if (datos.esVictoria && datos.vidasPerdidas === 0) {
+    if (!esElementales && datos.esVictoria && datos.vidasPerdidas === 0) {
       actualizaciones[`estadisticas.${modalidad}.partidasSinPerderVida`] = FieldValue.increment(1);
     }
     actualizaciones.coronas = FieldValue.increment(datos.coronas || 0);

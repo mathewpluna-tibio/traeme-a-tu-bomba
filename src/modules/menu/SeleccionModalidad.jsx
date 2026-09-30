@@ -1,7 +1,7 @@
 const MODALIDADES = [
   { id: "estandar", nombre: "Estándar" },
   { id: "venenosas", nombre: "Bombas Venenosas" },
-  { id: "caos", nombre: "Caos" },
+  { id: "elementales", nombre: "Bombas Elementales" },
 ];
 
 export default function SeleccionModalidad({ onSeleccionar, onCancelar }) {

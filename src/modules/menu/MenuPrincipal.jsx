@@ -13,6 +13,7 @@ import PartidaScreen from "../gameplay/PartidaScreen";
 import RankingsPage from "../rankings/RankingsPage";
 import PerfilPage from "../perfil/PerfilPage";
 import MisionesPage from "../misiones/MisionesPage";
+import LogrosPage from "../logros/LogrosPage";
 import logo from "../../assets/Logo_TATomba.png";
 import UserBomb from "../../assets/UserBomb.png"
 import "./MenuPrincipal.css";
@@ -115,7 +116,7 @@ export default function MenuPrincipal() {
     } else if (id === "ranking") {
       setPantallaActiva("ranking");
     } else if (id === "logros") {
-      setPantallaActiva("misiones");
+      setPantallaActiva("logros");
     }
   };
 
@@ -186,7 +187,6 @@ export default function MenuPrincipal() {
         <div className="gm-footer-icons">
           <button className="gm-icon-btn" aria-label="Configuración">⚙️</button>
           <button className="gm-icon-btn" aria-label="Ayuda">❓</button>
-          <button className="gm-icon-btn" aria-label="Notificaciones">🔔</button>
         </div>
 
         <div
@@ -248,6 +248,12 @@ export default function MenuPrincipal() {
     {pantallaActiva === "misiones" && (
       <div className="gm-content-full">
         <MisionesPage onVolver={volverAJugar} />
+      </div>
+    )}
+
+    {pantallaActiva === "logros" && (
+      <div className="gm-content-full">
+        <LogrosPage onVolver={volverAJugar} />
       </div>
     )}
 

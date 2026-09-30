@@ -1,4 +1,13 @@
 export default function StatsPanel({ profile, modalidad }) {
+  return (
+    <section className="pf-section">
+      <h2 className="pf-section-title">Estadísticas</h2>
+      <StatsContent profile={profile} modalidad={modalidad} />
+    </section>
+  );
+}
+
+function StatsContent({ profile, modalidad }) {
   if (modalidad === "general") {
     return <VistaGeneral estadisticas={profile.estadisticas} />;
   }
@@ -6,7 +15,7 @@ export default function StatsPanel({ profile, modalidad }) {
   const stats = profile.estadisticas?.[modalidad];
 
   if (!stats) {
-    return <p>No hay estadísticas disponibles para esta modalidad.</p>;
+    return <p className="pf-stats-empty">No hay estadísticas disponibles para esta modalidad.</p>;
   }
 
   // Consideramos "sin partidas" cuando victorias + derrotas (+ empates si aplica) es 0
@@ -16,7 +25,7 @@ export default function StatsPanel({ profile, modalidad }) {
     (stats.empates || 0);
 
   if (totalPartidas === 0) {
-    return <p>No hay estadísticas disponibles para esta modalidad.</p>;
+    return <p className="pf-stats-empty">No hay estadísticas disponibles para esta modalidad.</p>;
   }
 
   if (modalidad === "elementales") {
@@ -38,37 +47,45 @@ function VistaGeneral({ estadisticas }) {
   );
 
   return (
-    <div className="stats-panel">
-      <h3>Vista General</h3>
-      <p>Victorias totales: {totalVictorias}</p>
-      <p>Derrotas totales: {totalDerrotas}</p>
+    <div className="pf-stats-grid">
+      <StatCard label="Victorias totales" value={totalVictorias} />
+      <StatCard label="Derrotas totales" value={totalDerrotas} />
     </div>
   );
 }
 
 function StatsEstandarVenenosas({ stats }) {
   return (
-    <div className="stats-panel">
-      <p>Elo: {stats.elo}</p>
-      <p>Rango: {stats.rango}</p>
-      <p>Victorias: {stats.victorias}</p>
-      <p>Derrotas: {stats.derrotas}</p>
-      <p>Vidas perdidas: {stats.vidasPerdidas}</p>
-      <p>Partidas sin perder vida: {stats.partidasSinPerderVida}</p>
+    <div className="pf-stats-grid">
+      <StatCard label="Elo" value={stats.elo} />
+      <StatCard label="Rango" value={stats.rango} />
+      <StatCard label="Victorias" value={stats.victorias} />
+      <StatCard label="Derrotas" value={stats.derrotas} />
+      <StatCard label="Vidas perdidas" value={stats.vidasPerdidas} />
+      <StatCard label="Partidas sin perder vida" value={stats.partidasSinPerderVida} />
     </div>
   );
 }
 
 function StatsElementales({ stats }) {
   return (
-    <div className="stats-panel">
-      <p>Elo: {stats.elo}</p>
-      <p>Rango: {stats.rango}</p>
-      <p>Victorias: {stats.victorias}</p>
-      <p>Derrotas: {stats.derrotas}</p>
-      <p>Empates: {stats.empates}</p>
-      <p>Casillas marcadas: {stats.casillasMarcadas}</p>
-      <p>Bombas de hielo usadas: {stats.bombasHieloUsadas}</p>
+    <div className="pf-stats-grid">
+      <StatCard label="Elo" value={stats.elo} />
+      <StatCard label="Rango" value={stats.rango} />
+      <StatCard label="Victorias" value={stats.victorias} />
+      <StatCard label="Derrotas" value={stats.derrotas} />
+      <StatCard label="Empates" value={stats.empates} />
+      <StatCard label="Casillas marcadas" value={stats.casillasMarcadas} />
+      <StatCard label="Bombas de hielo usadas" value={stats.bombasHieloUsadas} />
+    </div>
+  );
+}
+
+function StatCard({ label, value }) {
+  return (
+    <div className="pf-stat-card">
+      <span className="pf-stat-label">{label}</span>
+      <span className="pf-stat-value">{value}</span>
     </div>
   );
 }

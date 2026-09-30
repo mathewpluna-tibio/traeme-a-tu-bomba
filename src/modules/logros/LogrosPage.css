@@ -1,0 +1,104 @@
+.logros-page {
+  padding: 20px;
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.logros-volver {
+  background: none;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  opacity: 0.8;
+  margin-bottom: 12px;
+  padding: 0;
+  font-size: 14px;
+}
+
+.logros-resumen {
+  opacity: 0.7;
+  margin-bottom: 20px;
+}
+
+.logros-seccion {
+  margin-bottom: 28px;
+}
+
+.logros-seccion-titulo {
+  margin-bottom: 10px;
+  border-bottom: 1px solid #ddd;
+  padding-bottom: 4px;
+}
+
+
+.logros-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.logro-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  border: 1px solid #ddd;
+}
+
+.logro-bloqueado {
+  opacity: 0.6;
+  background: #f7f7f7;
+}
+
+.logro-desbloqueado {
+  background: #fff8e1;
+  border-color: #f9a825;
+}
+
+.logro-icono {
+  font-size: 28px;
+  flex-shrink: 0;
+}
+
+.logro-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.logro-descripcion {
+  margin: 0 0 6px;
+  font-weight: 600;
+  color: #000000;
+}
+
+.logro-barra-fondo {
+  background: #e0e0e0;
+  border-radius: 4px;
+  height: 8px;
+  overflow: hidden;
+}
+
+.logro-barra-relleno {
+  background: #4caf50;
+  height: 100%;
+  transition: width 0.3s ease;
+}
+
+.logro-desbloqueado .logro-barra-relleno {
+  background: #f9a825;
+}
+
+.logro-detalle {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 6px;
+  font-size: 13px;
+  opacity: 0.8;
+  color: #000000;
+}
+
+.logro-recompensa {
+  text-align: right;
+  color: #000000;
+}

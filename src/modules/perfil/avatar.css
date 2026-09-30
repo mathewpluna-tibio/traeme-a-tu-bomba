@@ -1,26 +1,269 @@
-.avatar-container {
+
+.pf-page {
+  --pf-bg-dark: #0f1015;
+  --pf-card-dark: #1c1d27;
+  --pf-card-dark-2: #23242f;
+  --pf-orange: #ff7a1a;
+  --pf-orange-2: #ff9633;
+  --pf-gold: #ffd166;
+  --pf-text-light: #f4f4f8;
+  --pf-text-muted: #9a9aab;
+  --pf-border-soft: rgba(255, 255, 255, 0.08);
+  --pf-font-display: "Baloo 2", sans-serif;
+  --pf-font-body: "Nunito", sans-serif;
+
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 20px 20px 60px;
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+  gap: 24px;
+  background: var(--pf-bg-dark);
+  color: var(--pf-text-light);
+  font-family: var(--pf-font-body);
+  border-radius: 16px;
 }
 
-.marco {
-  width: 100px;
-  height: 100px;
-  border-radius: 50%;
-  padding: 4px; /* grosor visual del marco */
+.pf-page * {
+  box-sizing: border-box;
+}
+
+.pf-back {
+  background: none;
+  border: none;
+  color: var(--pf-text-muted);
+  cursor: pointer;
+  font-family: var(--pf-font-body);
+  font-size: 14px;
+  align-self: flex-start;
+  padding: 0;
+}
+
+.pf-back:hover {
+  color: var(--pf-text-light);
+}
+
+/* ===================== TARJETA DE IDENTIDAD ===================== */
+
+.pf-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  text-align: center;
+  border-radius: 20px;
+  padding: 36px 24px;
+  background-size: cover;
+  background-position: center;
+  overflow: hidden;
+}
+
+/* Oscurece un poco el banner para que el texto siempre se lea bien,
+   sin importar qué tan clara sea la imagen de fondo */
+.pf-card-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(15, 16, 21, 0.35) 0%, rgba(15, 16, 21, 0.75) 100%);
+}
+
+.pf-card > * {
+  position: relative;
+  z-index: 1;
+}
+
+.pf-avatar-frame {
+  position: relative;
+  width: 140px;
+  height: 140px;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-.avatar-img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
+/* El ancho/alto real se calcula en ProfileHeader.jsx (inline style) a
+   partir del "holeRatio" de cada marco en data/cosmeticos.js, porque
+   cada diseño tiene un borde de grosor distinto (007/Dino son mucho
+   más gruesos que Default/Metal) y un tamaño fijo no cabe en todos. */
+.pf-avatar {
   border-radius: 50%;
+  object-fit: cover;
+  background: #14151c;
 }
 
-/* Ejemplo de estilo por rango — luego los reemplazamos con los diseños reales */
-.marco.marco_cadete {
-  background: linear-gradient(45deg, #ff8c00, #ffa500);
+/* El marco es una imagen con el centro transparente, más grande que el
+   avatar para que quede montada encima como aro decorativo. Las imágenes
+   ya vienen recortadas a un lienzo cuadrado, así que object-fit: contain
+   ya no las deforma ni las corta. */
+.pf-marco {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+}
+
+.pf-online-dot {
+  position: absolute;
+  bottom: 6px;
+  right: 6px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #3ea56e;
+  border: 3px solid #1c1d27;
+  z-index: 2;
+}
+
+.pf-identity {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.pf-username {
+  font-family: var(--pf-font-display);
+  font-size: 22px;
+  font-weight: 700;
+  color: #fff;
+}
+
+/* Título activo (RQF-PER-04) */
+.pf-title-banner {
+  font-size: 12px;
+  font-weight: 700;
+  color: #10331a;
+  background: var(--pf-gold);
+  padding: 3px 14px;
+  clip-path: polygon(6% 0%, 94% 0%, 100% 50%, 94% 100%, 6% 100%, 0% 50%);
+}
+
+.pf-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.pf-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 18px;
+  border-radius: 10px;
+  border: none;
+  font-family: var(--pf-font-body);
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  transition: filter 0.12s ease, opacity 0.12s ease;
+}
+
+.pf-btn:hover {
+  filter: brightness(1.08);
+}
+
+.pf-btn--primary {
+  background: linear-gradient(180deg, var(--pf-orange-2), var(--pf-orange));
+  color: #fff;
+}
+
+.pf-btn--secondary {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+}
+
+.pf-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  filter: none;
+}
+
+/* ===================== SELECTOR DE MODALIDAD ===================== */
+
+.pf-mode-tabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.pf-mode-tab {
+  border: 1px solid var(--pf-border-soft);
+  background: var(--pf-card-dark-2);
+  color: var(--pf-text-muted);
+  font-family: var(--pf-font-body);
+  font-weight: 700;
+  font-size: 12px;
+  padding: 8px 14px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.pf-mode-tab:hover {
+  color: var(--pf-text-light);
+}
+
+.pf-mode-tab--active {
+  background: linear-gradient(180deg, var(--pf-orange-2), var(--pf-orange));
+  color: #fff;
+  border-color: transparent;
+}
+
+/* ===================== SECCIONES / ESTADÍSTICAS ===================== */
+
+.pf-section {
+  background: var(--pf-card-dark);
+  border: 1px solid var(--pf-border-soft);
+  border-radius: 16px;
+  padding: 20px;
+}
+
+.pf-section-title {
+  font-family: var(--pf-font-display);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.pf-stats-grid {
+  margin-top: 16px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+}
+
+.pf-stat-card {
+  background: var(--pf-card-dark-2);
+  border: 1px solid var(--pf-border-soft);
+  border-radius: 12px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.pf-stat-label {
+  font-size: 11px;
+  color: var(--pf-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.pf-stat-value {
+  font-family: var(--pf-font-display);
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--pf-gold);
+}
+
+.pf-stats-empty {
+  margin-top: 16px;
+  font-size: 13px;
+  color: var(--pf-text-muted);
+  text-align: center;
+  padding: 20px 0;
 }

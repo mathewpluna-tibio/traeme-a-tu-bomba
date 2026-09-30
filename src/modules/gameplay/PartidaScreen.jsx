@@ -5,6 +5,7 @@ import Tablero from "./Tablero";
 import FasePreparacion from "./FasePreparacion";
 import ModalResultados from "./ModalResultados";
 import FaseJuego from "./FaseJuego";
+import FaseJuegoElemental from "./FaseJuegoElemental";
 
 export default function PartidaScreen({ partidaId, onVolverAlMenu, onJugarDeNuevo }) {
   const { partida, loading } = usePartida(partidaId);
@@ -25,18 +26,27 @@ export default function PartidaScreen({ partidaId, onVolverAlMenu, onJugarDeNuev
 
   if (!partida.casillas) return <p>Generando tablero...</p>;
 
+  const esElementales = partida.modalidad === "elementales";
+
   return (
     <div className="partida-screen">
       <h2>Partida en curso</h2>
       <p>Modalidad: {partida.modalidad}</p>
-      <p>Tablero: {partida.tablero}</p>
-      <p>Ronda: {partida.ronda}</p>
+      {!esElementales && (
+        <>
+          <p>Tablero: {partida.tablero}</p>
+          <p>Ronda: {partida.ronda}</p>
+        </>
+      )}
       <p>Estado: {partida.estado}</p>
 
       {partida.estado === "preparacion" && (
         <FasePreparacion partidaId={partidaId} partida={partida} />
       )}
-      {partida.estado === "en_curso" && (
+      {partida.estado === "en_curso" && esElementales && (
+        <FaseJuegoElemental partidaId={partidaId} partida={partida} />
+      )}
+      {partida.estado === "en_curso" && !esElementales && (
         <FaseJuego partidaId={partidaId} partida={partida} />
       )}
       {partida.estado === "finalizada" && (
