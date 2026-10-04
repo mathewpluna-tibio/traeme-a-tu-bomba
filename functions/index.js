@@ -119,6 +119,7 @@ exports.validarUsername = onCall(async (request) => {
 });
 
 exports.limpiarInvitadosViejos = require("./mantenimiento").limpiarInvitadosViejos;
+exports.comprarCosmetico = require("./tienda").comprarCosmetico;
 
 //TRIGGER MATCHMAKING - RECIBE CADA VEZ QUE CAMBIA LA COLA
 

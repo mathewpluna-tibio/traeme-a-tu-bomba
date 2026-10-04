@@ -14,6 +14,8 @@ import RankingsPage from "../rankings/RankingsPage";
 import PerfilPage from "../perfil/PerfilPage";
 import MisionesPage from "../misiones/MisionesPage";
 import LogrosPage from "../logros/LogrosPage";
+import InventarioPage from "../inventario/InventarioPage";
+import TiendaPage from "../tienda/TiendaPage";
 import logo from "../../assets/Logo_TATomba.png";
 import UserBomb from "../../assets/UserBomb.png"
 import "./MenuPrincipal.css";
@@ -117,6 +119,10 @@ export default function MenuPrincipal() {
       setPantallaActiva("ranking");
     } else if (id === "logros") {
       setPantallaActiva("logros");
+    } else if (id === "inventario") {
+      setPantallaActiva("inventario");
+    } else if (id === "tienda") {
+      setPantallaActiva("tienda");
     }
   };
 
@@ -187,6 +193,7 @@ export default function MenuPrincipal() {
         <div className="gm-footer-icons">
           <button className="gm-icon-btn" aria-label="Configuración">⚙️</button>
           <button className="gm-icon-btn" aria-label="Ayuda">❓</button>
+          <button className="gm-icon-btn" aria-label="Notificaciones">🔔</button>
         </div>
 
         <div
@@ -254,6 +261,18 @@ export default function MenuPrincipal() {
     {pantallaActiva === "logros" && (
       <div className="gm-content-full">
         <LogrosPage onVolver={volverAJugar} />
+      </div>
+    )}
+
+    {pantallaActiva === "inventario" && (
+      <div className="gm-content-full">
+        <InventarioPage onVolver={volverAJugar} />
+      </div>
+    )}
+
+    {pantallaActiva === "tienda" && (
+      <div className="gm-content-full">
+        <TiendaPage onVolver={volverAJugar} />
       </div>
     )}
 

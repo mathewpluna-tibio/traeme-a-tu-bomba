@@ -1,0 +1,97 @@
+.inventario-page {
+  padding: 20px;
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.inventario-page h2 {
+  color: var(--gm-text-light, #f4f4f8);
+}
+
+.inventario-volver {
+  background: none;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  opacity: 0.8;
+  margin-bottom: 12px;
+  padding: 0;
+  font-size: 14px;
+}
+
+.inventario-pestanas {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid #ddd;
+}
+
+.inventario-pestana {
+  background: none;
+  border: none;
+  padding: 10px 16px;
+  cursor: pointer;
+  opacity: 0.6;
+  border-bottom: 2px solid transparent;
+  color: var(--gm-text-muted, #9a9aab);
+}
+
+.inventario-pestana.activa {
+  opacity: 1;
+  border-bottom-color: #f9a825;
+  font-weight: 600;
+  color: var(--gm-orange-2, #ff9633);
+}
+
+.inventario-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 16px;
+}
+
+.inventario-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  text-align: center;
+}
+
+.inventario-item-activo {
+  background: #fff8e1;
+  border-color: #f9a825;
+}
+
+.inventario-item-activo .inventario-item-nombre,
+.inventario-item-activo .inventario-titulo-preview {
+  color: #000000;
+}
+
+.inventario-marco-preview {
+  width: 64px;
+  height: 64px;
+  object-fit: contain;
+}
+
+.inventario-banner-preview {
+  width: 100%;
+  min-height: 60px;
+  border-radius: 6px;
+  background-size: cover;
+  background-position: center;
+}
+
+.inventario-item-nombre {
+  margin: 0;
+  font-weight: 600;
+}
+
+.inventario-titulo-preview {
+  margin: 0;
+  font-size: 16px;
+  font-style: italic;
+  opacity: 0.85;
+}
