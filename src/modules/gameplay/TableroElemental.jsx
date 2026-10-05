@@ -7,6 +7,7 @@ export default function TableroElemental({
   casillasSeleccionadas = [],
   onCasillaClick,
   deshabilitado,
+  casillaEnProceso = null,
 }) {
   const { filas, columnas } = calcularDimensionesElemental(partida);
   const resaltadas = new Set(casillasResaltadas);
@@ -33,16 +34,19 @@ export default function TableroElemental({
       if (bloqueada) clases.push("casilla-elemental-bloqueada");
       if (esResaltada) clases.push("casilla-elemental-jugable");
       if (esSeleccionada) clases.push("casilla-elemental-seleccionada");
+      const enProceso = casillaEnProceso === clave;
+      if (enProceso) clases.push("casilla-elemental-procesando");
 
       celdas.push(
         <button
           key={clave}
           className={clases.join(" ")}
           data-casilla={clave}
-          disabled={deshabilitado || (!esResaltada && !esSeleccionada)}
+          disabled={deshabilitado || (!esResaltada && !esSeleccionada && !enProceso)}
           onClick={() => onCasillaClick(clave)}
           title={bloqueada ? "Bloqueada por Lianas" : undefined}
         >
+          {enProceso && <span className="spinner-mini" />}
           {bloqueada && <span className="icono-elemental">🌿</span>}
         </button>
       );

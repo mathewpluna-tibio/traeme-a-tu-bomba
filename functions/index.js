@@ -22,6 +22,8 @@ const {
   aplicarBombaElectrica,
   aplicarBombaLianas,
   aplicarBombaHielo,
+  detectarRellenoAutomatico,
+  rellenarCasillasPara,
   partidaTerminada: partidaElementalTerminada,
   resolverGanadorPorCasillas,
   otroJugador: otroJugadorElemental,
@@ -32,6 +34,32 @@ const {
 // Timer de turno fijo confirmado para Bombas Elementales (una sola ronda,
 // no hay progresión de rondas como en Estándar/Venenosas).
 const DURACION_TURNO_ELEMENTAL_MS = 7000;
+
+// "Seguro" de Elementales: una jugada que el jugador hizo a tiempo cuenta
+// aunque el servidor tarde en recibirla (latencia, arranque en frío de la
+// función). Dos mitades:
+// 1) El turno solo se da por perdido pasados GRACIA ms desde finalizaEn.
+// 2) Las jugadas llevan la hora (corregida con el reloj del servidor) a la
+//    que el jugador hizo clic: si fue antes de finalizaEn, es válida aunque
+//    llegue después.
+const GRACIA_TURNO_ELEMENTAL_MS = 2500;
+
+function validarAccionEnTiempoElemental(partida, { numeroTurno, enviadoEn }) {
+  // La jugada pertenece al turno que el jugador veía; si ya cambió, no se aplica.
+  if (numeroTurno != null && numeroTurno !== partida.numeroTurno) {
+    throw new HttpsError("failed-precondition", "Se acabó el tiempo de tu turno.");
+  }
+  const finalizaEn = partida.turnoActual?.finalizaEn;
+  if (!finalizaEn) return;
+  if (typeof enviadoEn === "number") {
+    // 500 ms de tolerancia por la imprecisión de serverTimeOffset
+    if (enviadoEn > finalizaEn + 500) {
+      throw new HttpsError("failed-precondition", "Se acabó el tiempo de tu turno.");
+    }
+  } else if (Date.now() > finalizaEn + GRACIA_TURNO_ELEMENTAL_MS) {
+    throw new HttpsError("failed-precondition", "Se acabó el tiempo de tu turno.");
+  }
+}
 const { onValueWritten } = require("firebase-functions/v2/database");
 const { getDatabase } = require("firebase-admin/database");
 const { initializeApp, getApps } = require("firebase-admin/app");
@@ -120,6 +148,13 @@ exports.validarUsername = onCall(async (request) => {
 
 exports.limpiarInvitadosViejos = require("./mantenimiento").limpiarInvitadosViejos;
 exports.comprarCosmetico = require("./tienda").comprarCosmetico;
+exports.enviarSolicitudAmistad = require("./social").enviarSolicitudAmistad;
+exports.responderSolicitudAmistad = require("./social").responderSolicitudAmistad;
+exports.eliminarAmigo = require("./social").eliminarAmigo;
+exports.crearLobby = require("./lobby").crearLobby;
+exports.cancelarLobby = require("./lobby").cancelarLobby;
+exports.rechazarReto = require("./lobby").rechazarReto;
+exports.unirseALobby = require("./lobby").unirseALobby;
 
 //TRIGGER MATCHMAKING - RECIBE CADA VEZ QUE CAMBIA LA COLA
 
@@ -1008,6 +1043,17 @@ async function avanzarTurnoElemental(partidaId, uidPropuesto) {
   const partida = partidaSnap.val();
   if (!partida || partida.estado !== "en_curso") return;
 
+  // Si un jugador ya no puede jugar nada y el rival aún puede expandirse,
+  // el rival se queda con todas las casillas que alcanzaría y se acaba.
+  const uidRelleno = detectarRellenoAutomatico(partida);
+  if (uidRelleno) {
+    await rtdb.ref(`partidas/${partidaId}`).update(rellenarCasillasPara(uidRelleno, partida));
+    const partidaRellena = (await rtdb.ref(`partidas/${partidaId}`).once("value")).val();
+    console.log(`[Elementales] Relleno automático para ${uidRelleno} en partida ${partidaId}.`);
+    await finalizarPartidaElemental(partidaId, partidaRellena);
+    return;
+  }
+
   if (partidaElementalTerminada(partida)) {
     await finalizarPartidaElemental(partidaId, partida);
     return;
@@ -1064,7 +1110,7 @@ exports.marcarCasillaElemental = onCall(async (request) => {
   const uid = request.auth?.uid;
   if (!uid) throw new HttpsError("unauthenticated", "Debes iniciar sesión.");
 
-  const { partidaId, casillaClave } = request.data || {};
+  const { partidaId, casillaClave, numeroTurno, enviadoEn } = request.data || {};
   if (!partidaId || !casillaClave) {
     throw new HttpsError("invalid-argument", "Faltan datos.");
   }
@@ -1085,6 +1131,8 @@ exports.marcarCasillaElemental = onCall(async (request) => {
     throw new HttpsError("permission-denied", "No perteneces a esta partida.");
   }
 
+  validarAccionEnTiempoElemental(partida, { numeroTurno, enviadoEn });
+
   if (!casillasPropiasDisponibles(uid, partida).includes(casillaClave)) {
     throw new HttpsError("invalid-argument", "Esa casilla no es un movimiento válido.");
   }
@@ -1101,7 +1149,7 @@ exports.usarBombaElemental = onCall(async (request) => {
   const uid = request.auth?.uid;
   if (!uid) throw new HttpsError("unauthenticated", "Debes iniciar sesión.");
 
-  const { partidaId, tipoBomba, casillaObjetivo, casillasBloqueo } = request.data || {};
+  const { partidaId, tipoBomba, casillaObjetivo, casillasBloqueo, numeroTurno, enviadoEn } = request.data || {};
   if (!partidaId || !tipoBomba || !casillaObjetivo) {
     throw new HttpsError("invalid-argument", "Faltan datos.");
   }
@@ -1126,6 +1174,7 @@ exports.usarBombaElemental = onCall(async (request) => {
   if (!jugador.bombas?.[tipoBomba]) {
     throw new HttpsError("failed-precondition", "Ya usaste esa bomba.");
   }
+  validarAccionEnTiempoElemental(partida, { numeroTurno, enviadoEn });
 
   let actualizaciones;
   try {
@@ -1168,7 +1217,8 @@ exports.verificarTimeoutTurnoElemental = onCall(async (request) => {
   }
 
   const finalizaEn = partida.turnoActual?.finalizaEn;
-  if (!finalizaEn || Date.now() < finalizaEn) return { expirado: false };
+  // Con gracia: da tiempo a que llegue una jugada hecha a tiempo pero lenta.
+  if (!finalizaEn || Date.now() < finalizaEn + GRACIA_TURNO_ELEMENTAL_MS) return { expirado: false };
 
   const uidActivo = partida.turnoActual.uidActivo;
   // Se le acabó el tiempo: pierde el turno sin marcar nada (confirmado).

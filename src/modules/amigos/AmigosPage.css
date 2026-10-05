@@ -1,0 +1,167 @@
+.amg-page {
+  padding: 20px;
+  max-width: 720px;
+  margin: 0 auto;
+  text-align: left;
+  color: var(--gm-text-light, #f4f4f8);
+}
+
+.amg-page h2 {
+  color: var(--gm-text-light, #f4f4f8);
+  margin-bottom: 12px;
+}
+
+.amg-page h3 {
+  color: var(--gm-text-light, #f4f4f8);
+  margin: 20px 0 10px;
+  font-size: 16px;
+}
+
+.amg-volver {
+  background: none;
+  border: none;
+  color: var(--gm-text-muted, #9a9aab);
+  cursor: pointer;
+  padding: 0;
+  margin-bottom: 12px;
+  font-size: 14px;
+}
+
+.amg-aviso {
+  background: var(--gm-card-dark, #1c1d27);
+  border: 1px solid var(--gm-border-soft, rgba(255, 255, 255, 0.06));
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 14px;
+  color: var(--gm-text-muted, #9a9aab);
+  margin-bottom: 14px;
+}
+
+.amg-busqueda {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 12px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--gm-border-soft, rgba(255, 255, 255, 0.12));
+  background: var(--gm-card-dark, #1c1d27);
+  color: var(--gm-text-light, #f4f4f8);
+  font-size: 15px;
+}
+
+.amg-busqueda:focus {
+  outline: 2px solid var(--gm-orange-2, #ff9633);
+}
+
+.amg-error {
+  color: #ff6b6b;
+  margin-top: 10px;
+  font-size: 14px;
+}
+
+.amg-vacio {
+  color: var(--gm-text-muted, #9a9aab);
+  font-size: 14px;
+}
+
+.amg-lista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.amg-fila {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: var(--gm-card-dark, #1c1d27);
+  border: 1px solid var(--gm-border-soft, rgba(255, 255, 255, 0.06));
+  border-radius: 10px;
+  padding: 10px 14px;
+}
+
+.amg-fila-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  color: inherit;
+  text-align: left;
+  min-width: 0;
+}
+
+.amg-avatar-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.amg-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+}
+
+.amg-estado {
+  position: absolute;
+  right: -1px;
+  bottom: -1px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #6b6b7b;
+  border: 2px solid var(--gm-card-dark, #1c1d27);
+}
+
+.amg-estado--on {
+  background: #3ddc84;
+}
+
+.amg-nombre {
+  display: flex;
+  flex-direction: column;
+  font-weight: 700;
+  color: var(--gm-text-light, #f4f4f8);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.amg-nombre small {
+  font-weight: 400;
+  color: var(--gm-text-muted, #9a9aab);
+}
+
+.amg-acciones {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.amg-btn {
+  border: 1px solid var(--gm-border-soft, rgba(255, 255, 255, 0.12));
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--gm-text-light, #f4f4f8);
+  border-radius: 6px;
+  padding: 7px 12px;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.amg-btn--primary {
+  background: var(--gm-orange-2, #ff9633);
+  border-color: transparent;
+  color: #1c1d27;
+}
+
+.amg-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}

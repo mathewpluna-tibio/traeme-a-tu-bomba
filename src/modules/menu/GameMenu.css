@@ -480,3 +480,17 @@
     align-items: center;
   }
 }
+
+
+.gm-nav-badge {
+  margin-left: auto;
+  background: #ff4d4d;
+  color: #fff;
+  border-radius: 999px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  font-size: 11px;
+  line-height: 18px;
+  text-align: center;
+}

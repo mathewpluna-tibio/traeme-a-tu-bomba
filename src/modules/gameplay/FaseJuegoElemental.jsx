@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { httpsCallable } from "firebase/functions";
 import { functions } from "../../firebase/config";
 import { useAuth } from "../../context/AuthContext";
@@ -26,6 +26,8 @@ export default function FaseJuegoElemental({ partidaId, partida }) {
   const offset = useServerTimeOffset();
 
   const [procesando, setProcesando] = useState(false);
+  const procesandoRef = useRef(false);
+  const [casillaEnProceso, setCasillaEnProceso] = useState(null);
   const [error, setError] = useState("");
   const [segundosRestantes, setSegundosRestantes] = useState(null);
 
@@ -57,7 +59,9 @@ export default function FaseJuegoElemental({ partidaId, partida }) {
     const intervalo = setInterval(() => {
       const restante = Math.max(0, Math.ceil((finalizaEn - (Date.now() + offset)) / 1000));
       setSegundosRestantes(restante);
-      if (restante === 0) {
+      // Mientras mi propia jugada está en camino no pido el timeout: el
+      // servidor debe recibirla y contarla (seguro de tiempo).
+      if (restante === 0 && !procesandoRef.current) {
         verificarTimeoutTurnoElementalCallable({ partidaId }).catch((err) =>
           console.error("Error verificando timeout de turno:", err)
         );
@@ -75,6 +79,34 @@ export default function FaseJuegoElemental({ partidaId, partida }) {
       setBloqueoSeleccionado([]);
     }
   }, [esMiTurno, partida.numeroTurno]);
+
+  // Datos que acompañan cada jugada para el "seguro" del servidor: a qué
+  // turno pertenece y a qué hora (reloj del servidor) hice clic.
+  const datosDeTiempo = () => ({
+    numeroTurno: partida.numeroTurno,
+    enviadoEn: Date.now() + offset,
+  });
+
+  // Envuelve una jugada: marca la casilla como "cargando" desde el clic
+  // hasta que el servidor responde, aunque el contador ya haya llegado a 0.
+  const ejecutarJugada = async (casillaVisible, accion) => {
+    procesandoRef.current = true;
+    setProcesando(true);
+    setCasillaEnProceso(casillaVisible);
+    setError("");
+    try {
+      await accion();
+      return true;
+    } catch (err) {
+      console.error("Error en la jugada:", err);
+      setError(err.message || "No se pudo completar la jugada.");
+      return false;
+    } finally {
+      procesandoRef.current = false;
+      setProcesando(false);
+      setCasillaEnProceso(null);
+    }
+  };
 
   const cancelarModo = () => {
     setModo(null);
@@ -98,48 +130,37 @@ export default function FaseJuegoElemental({ partidaId, partida }) {
 
     // --- Movimiento normal ---
     if (modo === null) {
-      setProcesando(true);
-      setError("");
-      try {
-        await marcarCasillaElementalCallable({ partidaId, casillaClave: clave });
-      } catch (err) {
-        console.error("Error al marcar casilla:", err);
-        setError(err.message || "No se pudo marcar esa casilla.");
-      } finally {
-        setProcesando(false);
-      }
+      await ejecutarJugada(clave, () =>
+        marcarCasillaElementalCallable({ partidaId, casillaClave: clave, ...datosDeTiempo() })
+      );
       return;
     }
 
     // --- Eléctrica: un solo clic ---
     if (modo === "electrica") {
-      setProcesando(true);
-      setError("");
-      try {
-        await usarBombaElementalCallable({ partidaId, tipoBomba: "electrica", casillaObjetivo: clave });
-        cancelarModo();
-      } catch (err) {
-        console.error("Error al usar bomba eléctrica:", err);
-        setError(err.message || "No se pudo usar la bomba eléctrica.");
-      } finally {
-        setProcesando(false);
-      }
+      const ok = await ejecutarJugada(clave, () =>
+        usarBombaElementalCallable({
+          partidaId,
+          tipoBomba: "electrica",
+          casillaObjetivo: clave,
+          ...datosDeTiempo(),
+        })
+      );
+      if (ok) cancelarModo();
       return;
     }
 
     // --- Hielo: un solo clic (marca casilla + congela al rival) ---
     if (modo === "hielo") {
-      setProcesando(true);
-      setError("");
-      try {
-        await usarBombaElementalCallable({ partidaId, tipoBomba: "hielo", casillaObjetivo: clave });
-        cancelarModo();
-      } catch (err) {
-        console.error("Error al usar bomba de hielo:", err);
-        setError(err.message || "No se pudo usar la bomba de hielo.");
-      } finally {
-        setProcesando(false);
-      }
+      const ok = await ejecutarJugada(clave, () =>
+        usarBombaElementalCallable({
+          partidaId,
+          tipoBomba: "hielo",
+          casillaObjetivo: clave,
+          ...datosDeTiempo(),
+        })
+      );
+      if (ok) cancelarModo();
       return;
     }
 
@@ -172,22 +193,16 @@ export default function FaseJuegoElemental({ partidaId, partida }) {
 
   const confirmarLianas = async (casillasBloqueo) => {
     if (procesando || casillasBloqueo.length !== 3 || !casillaPropiaLianas) return;
-    setProcesando(true);
-    setError("");
-    try {
-      await usarBombaElementalCallable({
+    const ok = await ejecutarJugada(casillaPropiaLianas, () =>
+      usarBombaElementalCallable({
         partidaId,
         tipoBomba: "lianas",
         casillaObjetivo: casillaPropiaLianas,
         casillasBloqueo,
-      });
-      cancelarModo();
-    } catch (err) {
-      console.error("Error al usar Lianas:", err);
-      setError(err.message || "No se pudo usar Lianas.");
-    } finally {
-      setProcesando(false);
-    }
+        ...datosDeTiempo(),
+      })
+    );
+    if (ok) cancelarModo();
   };
 
   // Casillas resaltadas como jugables, según el modo actual.
@@ -225,7 +240,10 @@ export default function FaseJuegoElemental({ partidaId, partida }) {
 
       {esMiTurno ? (
         <p className="turno-activo">
-          Tu turno {segundosRestantes !== null && `(${segundosRestantes}s)`}
+          Tu turno{" "}
+          {procesando
+            ? "(enviando jugada...)"
+            : segundosRestantes !== null && `(${segundosRestantes}s)`}
         </p>
       ) : (
         <p className="turno-espera">
@@ -292,6 +310,7 @@ export default function FaseJuegoElemental({ partidaId, partida }) {
         casillasSeleccionadas={casillasSeleccionadas}
         onCasillaClick={handleCasillaClick}
         deshabilitado={!esMiTurno || procesando}
+        casillaEnProceso={casillaEnProceso}
       />
     </div>
   );

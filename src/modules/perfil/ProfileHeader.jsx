@@ -10,6 +10,8 @@ export default function ProfileHeader({
   uid,
   isOwnProfile = true,
   isOnline = false,
+  esAmigo = false,
+  solicitudEnviada = false,
   onAddFriend = (id) => console.log("Enviar solicitud de amistad a:", id),
   onChallenge = (id) => console.log("Retar a partida privada a:", id),
 }) {
@@ -42,13 +44,25 @@ export default function ProfileHeader({
         {profile.tituloActivo && (
           <span className="pf-title-banner">{profile.tituloActivo}</span>
         )}
+        {/* ID único: es el que se usa para buscar a un jugador (RQF-SOC-01) */}
+        <button
+          className="pf-id"
+          title="Copiar ID"
+          onClick={() => navigator.clipboard?.writeText(uid)}
+        >
+          ID: {uid} 📋
+        </button>
       </div>
 
       {/* RQF-SOC-02: solo al ver el perfil de OTRO jugador */}
       {!isOwnProfile && (
         <div className="pf-actions">
-          <button className="pf-btn pf-btn--secondary" onClick={() => onAddFriend(uid)}>
-            ➕ Agregar amigo
+          <button
+            className="pf-btn pf-btn--secondary"
+            disabled={esAmigo || solicitudEnviada}
+            onClick={() => onAddFriend(uid)}
+          >
+            {esAmigo ? "✓ Amigos" : solicitudEnviada ? "Solicitud enviada ✓" : "➕ Agregar amigo"}
           </button>
           <button
             className="pf-btn pf-btn--primary"

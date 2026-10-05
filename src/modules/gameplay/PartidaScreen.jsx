@@ -6,8 +6,18 @@ import FasePreparacion from "./FasePreparacion";
 import ModalResultados from "./ModalResultados";
 import FaseJuego from "./FaseJuego";
 import FaseJuegoElemental from "./FaseJuegoElemental";
+import InvitacionesRetos from "../lobby/InvitacionesRetos";
+import LobbyEntrante from "../lobby/LobbyEntrante";
 
-export default function PartidaScreen({ partidaId, onVolverAlMenu, onJugarDeNuevo }) {
+export default function PartidaScreen({
+  partidaId,
+  onVolverAlMenu,
+  onJugarDeNuevo,
+  onRevancha,
+  lobbyEntrante,
+  onAceptarReto,
+  onCerrarLobbyEntrante,
+}) {
   const { partida, loading } = usePartida(partidaId);
   const { user } = useAuth();
 
@@ -55,7 +65,18 @@ export default function PartidaScreen({ partidaId, onVolverAlMenu, onJugarDeNuev
           user={user}
           onVolverAlMenu={onVolverAlMenu}
           onJugarDeNuevo={onJugarDeNuevo}
+          onRevancha={onRevancha}
         />
+      )}
+      {/* Al terminar la partida sí se pueden recibir retos (p. ej. la revancha
+          del rival); durante la partida no, para no interrumpirla. */}
+      {partida.estado === "finalizada" && onAceptarReto && (
+        <>
+          <InvitacionesRetos onAceptar={onAceptarReto} />
+          {lobbyEntrante && (
+            <LobbyEntrante lobbyId={lobbyEntrante} onCerrar={onCerrarLobbyEntrante} />
+          )}
+        </>
       )}
     </div>
   );

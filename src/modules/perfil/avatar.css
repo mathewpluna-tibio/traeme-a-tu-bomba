@@ -1,4 +1,3 @@
-
 .pf-page {
   --pf-bg-dark: #0f1015;
   --pf-card-dark: #1c1d27;
@@ -267,4 +266,21 @@
   color: var(--pf-text-muted);
   text-align: center;
   padding: 20px 0;
+}
+
+.pf-id {
+  display: block;
+  margin-top: 6px;
+  background: none;
+  border: none;
+  padding: 0;
+  color: rgba(255, 255, 255, 0.85);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+  font-size: 11px;
+  cursor: pointer;
+  word-break: break-all;
+}
+
+.pf-id:hover {
+  color: var(--gm-text-light, #f4f4f8);
 }

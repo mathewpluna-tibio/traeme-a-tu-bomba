@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { useMachine } from "@xstate/react";
 import { doc, setDoc, getDoc } from "firebase/firestore";
-import { db } from "../../firebase/config";
+import { httpsCallable } from "firebase/functions";
+import { db, functions } from "../../firebase/config";
 import { useAuth } from "../../context/AuthContext";
 import { useUserProfile } from "../../hooks/useUserProfile";
 import { unirseACola, salirDeCola, refrescarEnCola } from "./matchmaking";
@@ -16,15 +17,23 @@ import MisionesPage from "../misiones/MisionesPage";
 import LogrosPage from "../logros/LogrosPage";
 import InventarioPage from "../inventario/InventarioPage";
 import TiendaPage from "../tienda/TiendaPage";
+import AmigosPage from "../amigos/AmigosPage";
+import LobbyEspera from "../lobby/LobbyEspera";
+import LobbyEntrante from "../lobby/LobbyEntrante";
+import InvitacionesRetos from "../lobby/InvitacionesRetos";
+import { useSolicitudesPendientes } from "../../hooks/useAmigos";
 import logo from "../../assets/Logo_TATomba.png";
 import UserBomb from "../../assets/UserBomb.png"
 import "./MenuPrincipal.css";
 import "./GameMenu.css";
 
+const crearLobbyCallable = httpsCallable(functions, "crearLobby");
+
 const NAV_ITEMS = [
   { id: "buscar", label: "Jugar", icon: "🎮" },
   { id: "tienda", label: "Tienda", icon: "🛒" },
   { id: "inventario", label: "Inventario", icon: "📦" },
+  { id: "amigos", label: "Amigos", icon: "👥" },
   { id: "ranking", label: "Ranking", icon: "🏆" },
   { id: "logros", label: "Logros", icon: "🎖️" },
   { id: "evento", label: "Evento", icon: "📅" },
@@ -39,6 +48,16 @@ export default function MenuPrincipal() {
 
   const [pantallaActiva, setPantallaActiva] = useState("jugar");
   const [perfilUidObjetivo, setPerfilUidObjetivo] = useState(null);
+  const solicitudes = useSolicitudesPendientes(user?.uid);
+
+  // RQF-MEN-06: quien entra por el enlace ?lobby=<id> cae directo al lobby.
+  const [lobbyEntrante, setLobbyEntrante] = useState(() =>
+    new URLSearchParams(window.location.search).get("lobby")
+  );
+  const cerrarLobbyEntrante = () => {
+    setLobbyEntrante(null);
+    window.history.replaceState({}, "", window.location.pathname);
+  };
 
   useEffect(() => {
     if (partidaId) {
@@ -63,6 +82,18 @@ export default function MenuPrincipal() {
   const onModalidadSeleccionada = async (modalidad) => {
     if (modalidad === "estandar") {
       send({ type: "SELECCIONAR_MODALIDAD_ESTANDAR" });
+    } else if (state.context.tipoAccion === "lobby") {
+      try {
+        const resultado = await crearLobbyCallable({
+          modalidad,
+          uidRetado: state.context.retadoUid || null,
+        });
+        send({ type: "SELECCIONAR_MODALIDAD_OTRA", modalidad, lobbyId: resultado.data.lobbyId });
+      } catch (err) {
+        console.error("Error al crear lobby:", err);
+        alert(err.message || "No se pudo crear el lobby.");
+        send({ type: "CANCELAR" });
+      }
     } else {
       if (state.context.tipoAccion === "buscar") {
         await unirseACola(modalidad, user.uid, null, user.isAnonymous);
@@ -71,8 +102,24 @@ export default function MenuPrincipal() {
     }
   };
 
-  const onClaseConfirmada = () => {
-    send({ type: "CLASE_CONFIRMADA" });
+  const onClaseConfirmada = (claseId, lobbyId) => {
+    send({ type: "CLASE_CONFIRMADA", lobbyId });
+  };
+
+  // Revancha en partida privada: nuevo lobby dirigido al mismo rival
+  const revancha = async (uidRival, modalidad, clase) => {
+    const resultado = await crearLobbyCallable({
+      modalidad,
+      clase: modalidad === "estandar" ? clase : null,
+      uidRetado: uidRival,
+    });
+    await limpiarNotificacion();
+    send({ type: "REVANCHA", modalidad, lobbyId: resultado.data.lobbyId, uidRetado: uidRival });
+  };
+
+  // RQF-SOC-02: retar a otro jugador = crear un lobby privado dirigido a él
+  const retarJugador = (uidRetado) => {
+    send({ type: "INICIAR_FLUJO", accion: "lobby", uidRetado });
   };
 
   const cancelarFlujo = () => {
@@ -123,6 +170,8 @@ export default function MenuPrincipal() {
       setPantallaActiva("inventario");
     } else if (id === "tienda") {
       setPantallaActiva("tienda");
+    } else if (id === "amigos") {
+      setPantallaActiva("amigos");
     }
   };
 
@@ -132,6 +181,10 @@ export default function MenuPrincipal() {
         partidaId={state.context.partidaId}
         onVolverAlMenu={volverAlMenuDesdePartida}
         onJugarDeNuevo={jugarDeNuevo}
+        onRevancha={revancha}
+        lobbyEntrante={lobbyEntrante}
+        onAceptarReto={setLobbyEntrante}
+        onCerrarLobbyEntrante={cerrarLobbyEntrante}
       />
     );
   }
@@ -145,8 +198,23 @@ export default function MenuPrincipal() {
       <SeleccionClase
         tipoAccion={state.context.tipoAccion}
         modalidad={state.context.modalidad}
+        uidRetado={state.context.retadoUid}
         onConfirmar={onClaseConfirmada}
         onCancelar={cancelarFlujo}
+      />
+    );
+  }
+
+  if (state.matches("lobby_espera")) {
+    return (
+      <LobbyEspera
+        lobbyId={state.context.lobbyId}
+        esReto={!!state.context.retadoUid}
+        onCancelar={() => send({ type: "CANCELAR_BUSQUEDA" })}
+        onCerrado={() => {
+          alert("El lobby se cerró (rechazaron el reto o fue cancelado).");
+          send({ type: "CANCELAR_BUSQUEDA" });
+        }}
       />
     );
   }
@@ -185,6 +253,9 @@ export default function MenuPrincipal() {
           >
             <span className="gm-nav-icon">{item.icon}</span>
             <span>{item.label}</span>
+            {item.id === "amigos" && solicitudes.length > 0 && (
+              <span className="gm-nav-badge">{solicitudes.length}</span>
+            )}
           </button>
         ))}
       </nav>
@@ -248,7 +319,7 @@ export default function MenuPrincipal() {
 
     {pantallaActiva === "perfil" && (
       <div className="gm-content-full">
-        <PerfilPage onVolver={volverAJugar} uidObjetivo={perfilUidObjetivo} />
+        <PerfilPage onVolver={volverAJugar} uidObjetivo={perfilUidObjetivo} onRetar={retarJugador} />
       </div>
     )}
 
@@ -270,11 +341,25 @@ export default function MenuPrincipal() {
       </div>
     )}
 
+    {pantallaActiva === "amigos" && (
+      <div className="gm-content-full">
+        <AmigosPage
+          onVolver={volverAJugar}
+          onVerPerfil={irAPerfilDe}
+          onRetar={retarJugador}
+          solicitudes={solicitudes}
+        />
+      </div>
+    )}
+
     {pantallaActiva === "tienda" && (
       <div className="gm-content-full">
         <TiendaPage onVolver={volverAJugar} />
       </div>
     )}
+
+    <InvitacionesRetos onAceptar={setLobbyEntrante} />
+    {lobbyEntrante && <LobbyEntrante lobbyId={lobbyEntrante} onCerrar={cerrarLobbyEntrante} />}
 
     {/* ===================== SIDEBAR DERECHA (siempre visible, en toda vista) ===================== */}
     <aside className="gm-sidebar gm-sidebar--right">

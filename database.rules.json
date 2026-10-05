@@ -26,8 +26,22 @@
     },
     "sesionActiva": {
       "$uid": {
-        ".read": "auth != null && auth.uid == $uid",
+        ".read": "auth != null",
         ".write": "auth != null && auth.uid == $uid"
+      }
+    },
+    "lobbies": {
+      "$lobbyId": {
+        ".read": "auth != null",
+        "estado": {
+          ".write": "auth != null && data.val() === 'esperando' && newData.val() === 'cancelada' && root.child('lobbies').child($lobbyId).child('creador').val() === auth.uid"
+        }
+      }
+    },
+    "invitaciones": {
+      "$uid": {
+        ".read": "auth != null && auth.uid == $uid",
+        ".write": false
       }
     }
   }

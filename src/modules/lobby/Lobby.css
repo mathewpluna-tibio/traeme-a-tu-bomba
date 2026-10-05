@@ -1,0 +1,138 @@
+.lobby-pantalla {
+  max-width: 520px;
+  margin: 80px auto 0;
+  padding: 24px;
+  text-align: center;
+  color: var(--gm-text-light, #f4f4f8);
+}
+
+.lobby-pantalla h2 {
+  color: var(--gm-text-light, #f4f4f8);
+}
+
+.lobby-texto {
+  color: var(--gm-text-light, #f4f4f8);
+  margin: 12px 0;
+}
+
+.lobby-nota {
+  color: var(--gm-text-muted, #9a9aab);
+  font-size: 13px;
+  margin: 12px 0 20px;
+}
+
+.lobby-enlace {
+  display: flex;
+  gap: 8px;
+}
+
+.lobby-enlace input {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: var(--gm-card-dark, #1c1d27);
+  color: var(--gm-text-light, #f4f4f8);
+  font-size: 14px;
+}
+
+.lobby-enlace button,
+.lobby-btn {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--gm-text-light, #f4f4f8);
+  border-radius: 8px;
+  padding: 9px 16px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.lobby-enlace button,
+.lobby-btn--primary {
+  background: var(--gm-orange-2, #ff9633);
+  border-color: transparent;
+  color: #1c1d27;
+}
+
+.lobby-btn:disabled,
+.lobby-cancelar:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.lobby-cancelar {
+  background: none;
+  border: none;
+  color: var(--gm-text-muted, #9a9aab);
+  cursor: pointer;
+  text-decoration: underline;
+  margin-top: 14px;
+}
+
+.lobby-error {
+  color: #ff6b6b;
+  font-size: 14px;
+}
+
+.lobby-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+}
+
+.lobby-modal {
+  background: var(--gm-bg-dark-2, #14151c);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+  padding: 24px;
+  max-width: 420px;
+  width: calc(100% - 32px);
+  text-align: center;
+  color: var(--gm-text-light, #f4f4f8);
+}
+
+.lobby-modal h3 {
+  color: var(--gm-text-light, #f4f4f8);
+  margin: 0 0 8px;
+}
+
+.lobby-clases {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.retos-contenedor {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  z-index: 40;
+}
+
+.reto-toast {
+  background: var(--gm-card-dark, #1c1d27);
+  border: 1px solid var(--gm-orange-2, #ff9633);
+  border-radius: 12px;
+  padding: 12px 14px;
+  max-width: 320px;
+  color: var(--gm-text-light, #f4f4f8);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.reto-toast p {
+  margin: 0 0 10px;
+  font-size: 14px;
+}
+
+.reto-toast div {
+  display: flex;
+  gap: 8px;
+}

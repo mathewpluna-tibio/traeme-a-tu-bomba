@@ -1,8 +1,10 @@
 import { useState, useRef } from "react";
-import { ref, set } from "firebase/database";
-import { rtdb } from "../../firebase/config";
+import { httpsCallable } from "firebase/functions";
+import { functions } from "../../firebase/config";
 import { useAuth } from "../../context/AuthContext";
 import { unirseACola } from "./matchmaking";
+
+const crearLobbyCallable = httpsCallable(functions, "crearLobby");
 
 // RQNF-MEN-03: identificador único por clase
 const CLASES = [
@@ -12,7 +14,7 @@ const CLASES = [
   { id: "aleatoria", nombre: "Aleatoria" },
 ];
 
-export default function SeleccionClase({ tipoAccion, modalidad, onConfirmar, onCancelar }) {
+export default function SeleccionClase({ tipoAccion, modalidad, uidRetado, onConfirmar, onCancelar }) {
   const [confirmando, setConfirmando] = useState(false);
   const yaConfirmado = useRef(false); // evita que se busque dos veces partida
   const { user } = useAuth();
@@ -26,12 +28,20 @@ export default function SeleccionClase({ tipoAccion, modalidad, onConfirmar, onC
 
     if (tipoAccion === "buscar") {
       await unirseACola(modalidad, user.uid, claseId, user.isAnonymous);
-    } else {
-      // RQF-MEN-05: generar enlace de invitación irrepetible (pendiente)
-      console.log("Creando lobby privado...");
+      onConfirmar(claseId);
+      return;
     }
 
-    onConfirmar(claseId);
+    // RQF-MEN-05: crear el lobby privado (y el reto, si se eligió a alguien)
+    try {
+      const resultado = await crearLobbyCallable({ modalidad, clase: claseId, uidRetado: uidRetado || null });
+      onConfirmar(claseId, resultado.data.lobbyId);
+    } catch (err) {
+      console.error("Error al crear lobby:", err);
+      alert(err.message || "No se pudo crear el lobby.");
+      yaConfirmado.current = false;
+      setConfirmando(false);
+    }
   };
 
   return (

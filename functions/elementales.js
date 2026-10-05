@@ -249,6 +249,58 @@ function jugadorTieneMovimientoValido(uid, partida) {
   return false;
 }
 
+/** Copia de la partida sin bloqueos de Lianas: los bloqueos son temporales
+ * (duran un turno), así que NO deben contar para decidir que un jugador
+ * está "atascado" de forma permanente. */
+function sinBloqueos(partida) {
+  return { ...partida, numeroTurno: Number.MAX_SAFE_INTEGER };
+}
+
+/** Regla de cierre anticipado: si un jugador ya no puede jugar nada (sin
+ * casillas adyacentes libres y sin Eléctrica útil) y el rival todavía puede
+ * seguir expandiéndose, el rival se queda con todo lo que podría alcanzar y
+ * la partida termina. Devuelve el uid del jugador que se queda con el
+ * relleno, o null si no aplica. */
+function detectarRellenoAutomatico(partida) {
+  const p = sinBloqueos(partida);
+  const [uidA, uidB] = Object.keys(partida.jugadores);
+  for (const [atascado, activo] of [[uidA, uidB], [uidB, uidA]]) {
+    if (
+      !jugadorTieneMovimientoValido(atascado, p) &&
+      casillasPropiasDisponibles(activo, p).length > 0
+    ) {
+      return activo;
+    }
+  }
+  return null;
+}
+
+/** Actualizaciones de RTDB que marcan para `uid` todas las casillas libres
+ * que podría alcanzar expandiéndose desde su territorio (recorrido por
+ * adyacencia a través de casillas libres). */
+function rellenarCasillasPara(uid, partida) {
+  const p = sinBloqueos(partida);
+  const visitadas = new Set(casillasPropiasDisponibles(uid, p));
+  const pendientes = [...visitadas];
+  while (pendientes.length > 0) {
+    const actual = pendientes.pop();
+    for (const vecino of vecinosOrtogonales(actual)) {
+      if (!visitadas.has(vecino) && casillaLibre(vecino, p)) {
+        visitadas.add(vecino);
+        pendientes.push(vecino);
+      }
+    }
+  }
+
+  const actualizaciones = {};
+  for (const clave of visitadas) {
+    actualizaciones[`casillas/${clave}/marcadaPor`] = uid;
+  }
+  actualizaciones[`jugadores/${uid}/casillasMarcadas`] =
+    (partida.jugadores[uid].casillasMarcadas || 0) + visitadas.size;
+  return actualizaciones;
+}
+
 function partidaTerminada(partida) {
   const [uidA, uidB] = Object.keys(partida.jugadores);
   return (
@@ -283,6 +335,8 @@ module.exports = {
   aplicarBombaLianas,
   aplicarBombaHielo,
   jugadorTieneMovimientoValido,
+  detectarRellenoAutomatico,
+  rellenarCasillasPara,
   partidaTerminada,
   resolverGanadorPorCasillas,
 };
