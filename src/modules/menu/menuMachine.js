@@ -6,6 +6,7 @@ export const menuMachine = setup({}).createMachine({
   context: {
     tipoAccion: null,
     modalidad: null,
+    clase: null,
     partidaId: null,
     lobbyId: null,
     retadoUid: null,
@@ -44,7 +45,7 @@ export const menuMachine = setup({}).createMachine({
             actions: assign({ modalidad: ({ event }) => event.modalidad }),
           },
         ],
-        CANCELAR: { target: "menu", actions: assign({ tipoAccion: null, modalidad: null, retadoUid: null }) },
+        CANCELAR: { target: "menu", actions: assign({ tipoAccion: null, modalidad: null, clase: null, retadoUid: null }) },
       },
     },
     clase: {
@@ -53,24 +54,29 @@ export const menuMachine = setup({}).createMachine({
           {
             guard: ({ context }) => context.tipoAccion === "lobby",
             target: "lobby_espera",
-            actions: assign({ lobbyId: ({ event }) => event.lobbyId }),
+            actions: assign({ lobbyId: ({ event }) => event.lobbyId, clase: ({ event }) => event.clase ?? null }),
           },
-          { target: "buscando" },
+          {
+            target: "buscando",
+            actions: assign({ clase: ({ event }) => event.clase ?? null }),
+          },
         ],
-        CANCELAR: { target: "menu", actions: assign({ tipoAccion: null, modalidad: null, retadoUid: null }) },
+        // Volver al paso anterior (Modalidad)
+        ATRAS: { target: "modalidad", actions: assign({ modalidad: null }) },
+        CANCELAR: { target: "menu", actions: assign({ tipoAccion: null, modalidad: null, clase: null, retadoUid: null }) },
       },
     },
     lobby_espera: {
       on: {
         CANCELAR_BUSQUEDA: {
           target: "menu",
-          actions: assign({ tipoAccion: null, modalidad: null, lobbyId: null, retadoUid: null }),
+          actions: assign({ tipoAccion: null, modalidad: null, clase: null, lobbyId: null, retadoUid: null }),
         },
       },
     },
     buscando: {
       on: {
-        CANCELAR_BUSQUEDA: { target: "menu", actions: assign({ tipoAccion: null, modalidad: null }) },
+        CANCELAR_BUSQUEDA: { target: "menu", actions: assign({ tipoAccion: null, modalidad: null, clase: null }) },
         PARTIDA_ENCONTRADA: {
           target: "en_partida",
           actions: assign({ partidaId: ({ event }) => event.partidaId }),
@@ -81,7 +87,7 @@ export const menuMachine = setup({}).createMachine({
       on: {
         VOLVER_AL_MENU: {
           target: "menu",
-          actions: assign({ tipoAccion: null, modalidad: null, partidaId: null, lobbyId: null, retadoUid: null }),
+          actions: assign({ tipoAccion: null, modalidad: null, clase: null, partidaId: null, lobbyId: null, retadoUid: null }),
         },
         // Partida privada: "Retar nuevamente" crea otro lobby dirigido al rival
         REVANCHA: {
@@ -90,6 +96,7 @@ export const menuMachine = setup({}).createMachine({
             partidaId: null,
             tipoAccion: () => "lobby",
             modalidad: ({ event }) => event.modalidad,
+            clase: ({ event }) => event.clase ?? null,
             lobbyId: ({ event }) => event.lobbyId,
             retadoUid: ({ event }) => event.uidRetado,
           }),
@@ -100,6 +107,7 @@ export const menuMachine = setup({}).createMachine({
             partidaId: null,
             tipoAccion: () => "buscar",
             modalidad: ({ event }) => event.modalidad,
+            clase: ({ event }) => event.clase ?? null,
           }),
         },
       },

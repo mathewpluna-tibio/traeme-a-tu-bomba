@@ -1,0 +1,490 @@
+@import url("https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Nunito:wght@600;700;800&display=swap");
+
+.sm-page {
+  --bg-dark: #0f1015;
+  --card-dark: #1c1d27;
+  --card-dark-2: #23242f;
+  --orange: #ff7a1a;
+  --orange-2: #ff9633;
+  --gold: #ffd166;
+  --danger: #e0522f;
+  --text-light: #f4f4f8;
+  --text-muted: #9a9aab;
+  --border-soft: rgba(255, 255, 255, 0.1);
+  --font-display: "Baloo 2", sans-serif;
+  --font-body: "Nunito", sans-serif;
+  color: var(--text-light);
+  font-family: var(--font-body);
+
+  min-height: 100vh;
+  text-align: left;
+  background: var(--bg-dark);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+}
+
+.sm-panel {
+  width: 100%;
+  max-width: 1040px;
+  background: linear-gradient(160deg, #241c66 0%, #4a37c2 55%, #7c5be0 100%);
+  border-radius: 26px;
+  padding: 32px 40px 36px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.35);
+}
+
+/* ===================== ENCABEZADO ===================== */
+
+.sm-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.sm-back {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  font-size: 18px;
+  cursor: pointer;
+}
+
+.sm-back:hover {
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.sm-back[hidden] {
+  display: none;
+}
+
+.sm-header-spacer {
+  width: 42px;
+}
+
+.sm-page .sm-title {
+  margin: 0;
+  color: #fff;
+  letter-spacing: normal;
+  font-family: var(--font-display);
+  font-size: 32px;
+  font-weight: 800;
+  text-align: center;
+  flex: 1;
+}
+
+/* ===================== PASOS ===================== */
+
+.sm-steps {
+  list-style: none;
+  display: flex;
+  justify-content: center;
+  gap: 32px;
+  font-size: 14px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.sm-step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sm-step-dot {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+}
+
+.sm-step--active {
+  color: #fff;
+}
+
+.sm-step--active .sm-step-dot {
+  background: linear-gradient(180deg, var(--orange-2), var(--orange));
+  border-color: transparent;
+}
+
+.sm-step--done .sm-step-dot {
+  background: rgba(255, 255, 255, 0.85);
+  color: #241c66;
+  border-color: transparent;
+}
+
+.sm-step[hidden] {
+  display: none;
+}
+
+/* ===================== VISTAS ===================== */
+
+.sm-view {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.sm-view--active {
+  display: flex;
+}
+
+.sm-subtitle {
+  text-align: center;
+  font-size: 16px;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+/* ===================== TARJETAS DE BOMBA ===================== */
+
+.sm-card-grid {
+  display: grid;
+  gap: 20px;
+}
+
+.sm-card-grid--3 {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.sm-card-grid--4 {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+.sm-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 26px 16px 22px;
+  border-radius: 20px;
+  border: 2px solid transparent;
+  background: rgba(15, 16, 21, 0.45);
+  color: var(--text-light);
+  font-family: var(--font-body);
+  cursor: pointer;
+  text-align: center;
+  transition: transform 0.12s ease, border-color 0.12s ease, background 0.12s ease;
+}
+
+.sm-card:hover {
+  transform: translateY(-4px);
+  background: rgba(15, 16, 21, 0.6);
+}
+
+.sm-card--selected {
+  border-color: var(--orange-2);
+  background: rgba(15, 16, 21, 0.7);
+  box-shadow: 0 0 0 3px rgba(255, 150, 51, 0.25), 0 10px 24px rgba(0, 0, 0, 0.3);
+}
+
+/* Espacio para TU imagen de bomba */
+.sm-card-image {
+  width: 140px;
+  max-width: 100%;
+  height: 140px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sm-card-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.4));
+}
+
+.sm-card-emoji {
+  font-size: 84px;
+}
+
+.sm-card-name {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.sm-card-desc {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.7);
+  line-height: 1.4;
+}
+
+.sm-card-detail {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--gold);
+}
+
+/* ===================== ESTADO DE BÚSQUEDA ===================== */
+
+.sm-status {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 8px 0 4px;
+  text-align: center;
+}
+
+.sm-status-visual {
+  width: 160px;
+  height: 160px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sm-status-visual img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.sm-status-visual .sm-card-emoji {
+  font-size: 100px;
+}
+
+.sm-status-visual--pulse {
+  animation: sm-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes sm-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.12); }
+}
+
+.sm-page .sm-status-title {
+  margin: 0;
+  color: #fff;
+  letter-spacing: normal;
+  font-family: var(--font-display);
+  font-size: 28px;
+  font-weight: 800;
+}
+
+.sm-status-text {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.75);
+  min-height: 18px;
+}
+
+.sm-chips {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.sm-chip {
+  font-size: 12px;
+  font-weight: 700;
+  padding: 5px 14px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.sm-timer {
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--gold);
+}
+
+.sm-timer:empty {
+  display: none;
+}
+
+.sm-invite {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+  max-width: 520px;
+}
+
+.sm-invite[hidden] {
+  display: none;
+}
+
+.sm-invite-input {
+  flex: 1;
+  padding: 13px 15px;
+  border-radius: 10px;
+  border: 1px solid var(--border-soft);
+  background: rgba(15, 16, 21, 0.5);
+  color: var(--text-light);
+  font-family: var(--font-body);
+  font-size: 14px;
+}
+
+.sm-rival {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 800;
+  font-size: 16px;
+}
+
+.sm-rival img {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: #333;
+}
+
+/* ===================== BOTONES ===================== */
+
+.sm-footer {
+  display: flex;
+  justify-content: center;
+}
+
+.sm-footer[hidden] {
+  display: none;
+}
+
+.sm-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 16px 52px;
+  border-radius: 12px;
+  border: none;
+  font-family: var(--font-body);
+  font-weight: 800;
+  font-size: 15px;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: filter 0.12s ease, transform 0.12s ease, opacity 0.12s ease;
+}
+
+.sm-btn:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+.sm-btn:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.sm-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.sm-btn--primary {
+  background: linear-gradient(180deg, var(--orange-2), var(--orange));
+  color: #fff;
+  box-shadow: 0 8px 18px rgba(255, 122, 26, 0.35);
+}
+
+.sm-btn--secondary {
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  padding: 13px 22px;
+  font-size: 13px;
+}
+
+.sm-btn--danger {
+  background: rgba(224, 82, 47, 0.2);
+  color: #ffb3a0;
+  border: 1px solid rgba(224, 82, 47, 0.5);
+  padding: 13px 30px;
+  font-size: 13px;
+}
+
+/* ===================== RESPONSIVE ===================== */
+
+@media (max-width: 1100px) {
+  .sm-panel {
+    padding: 28px 28px 32px;
+  }
+  .sm-card-image {
+    width: 120px;
+    height: 120px;
+  }
+  .sm-card-emoji {
+    font-size: 72px;
+  }
+  .sm-page .sm-title {
+    font-size: 28px;
+  }
+  .sm-card-grid {
+    gap: 16px;
+  }
+}
+
+@media (max-width: 720px) {
+  .sm-panel {
+    padding: 24px 16px 28px;
+    border-radius: 24px;
+  }
+  .sm-card-grid--3,
+  .sm-card-grid--4 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .sm-card {
+    padding: 24px 12px 20px;
+  }
+  .sm-card-image {
+    width: 110px;
+    height: 110px;
+  }
+  .sm-card-emoji {
+    font-size: 70px;
+  }
+  .sm-card-name {
+    font-size: 20px;
+  }
+  .sm-card-desc {
+    font-size: 13px;
+  }
+  .sm-page .sm-title {
+    font-size: 26px;
+  }
+  .sm-steps {
+    gap: 14px;
+    font-size: 12px;
+  }
+  .sm-btn {
+    padding: 18px 40px;
+    font-size: 16px;
+  }
+}
+
+.sm-page *,
+.sm-page *::before,
+.sm-page *::after {
+  box-sizing: border-box;
+}
+
+.sm-page p { margin: 0; }
+.sm-page .sm-steps { margin: 0; padding: 0; }
+.sm-page .sm-card-name, .sm-page .sm-card-desc, .sm-page .sm-card-detail { text-align: center; }
+
+
+/* Pantalla completa: el panel ocupa toda la ventana */
+.sm-page { padding: 0; align-items: stretch; }
+.sm-page .sm-panel {
+  max-width: none;
+  min-height: 100vh;
+  border-radius: 0;
+  box-shadow: none;
+  justify-content: center;
+  align-items: center;
+  padding: 32px clamp(16px, 5vw, 80px);
+}
+.sm-page .sm-panel > * { width: 100%; max-width: 1100px; }
+.sm-page .sm-panel > .sm-footer { max-width: 1100px; }

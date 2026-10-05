@@ -10,6 +10,7 @@ import { useNotificacionPartida } from "../../hooks/useNotificacionPartida";
 import { menuMachine } from "./menuMachine";
 import SeleccionModalidad from "./SeleccionModalidad";
 import SeleccionClase from "./SeleccionClase";
+import BuscandoPartida from "./BuscandoPartida";
 import PartidaScreen from "../gameplay/PartidaScreen";
 import RankingsPage from "../rankings/RankingsPage";
 import PerfilPage from "../perfil/PerfilPage";
@@ -103,7 +104,7 @@ export default function MenuPrincipal() {
   };
 
   const onClaseConfirmada = (claseId, lobbyId) => {
-    send({ type: "CLASE_CONFIRMADA", lobbyId });
+    send({ type: "CLASE_CONFIRMADA", lobbyId, clase: claseId });
   };
 
   // Revancha en partida privada: nuevo lobby dirigido al mismo rival
@@ -114,7 +115,7 @@ export default function MenuPrincipal() {
       uidRetado: uidRival,
     });
     await limpiarNotificacion();
-    send({ type: "REVANCHA", modalidad, lobbyId: resultado.data.lobbyId, uidRetado: uidRival });
+    send({ type: "REVANCHA", modalidad, clase: modalidad === "estandar" ? clase : null, lobbyId: resultado.data.lobbyId, uidRetado: uidRival });
   };
 
   // RQF-SOC-02: retar a otro jugador = crear un lobby privado dirigido a él
@@ -145,7 +146,7 @@ export default function MenuPrincipal() {
     const ultimaModalidad = prefSnap.exists() ? prefSnap.data().ultimaModalidad : "estandar";
     const ultimaClase = prefSnap.exists() ? prefSnap.data().ultimaClase : "aleatoria";
     await unirseACola(ultimaModalidad, user.uid, ultimaClase, user.isAnonymous);
-    send({ type: "JUGAR_DE_NUEVO", modalidad: ultimaModalidad });
+    send({ type: "JUGAR_DE_NUEVO", modalidad: ultimaModalidad, clase: ultimaModalidad === "estandar" ? ultimaClase : null });
   };
 
  const volverAJugar = () => {
@@ -189,27 +190,28 @@ export default function MenuPrincipal() {
     );
   }
 
+  // Buscar partida / lobby ocupa toda la pantalla
+  let modal = null;
   if (state.matches("modalidad")) {
-    return <SeleccionModalidad onSeleccionar={onModalidadSeleccionada} onCancelar={cancelarFlujo} />;
-  }
-
-  if (state.matches("clase")) {
-    return (
+    modal = <SeleccionModalidad tipoAccion={state.context.tipoAccion} onSeleccionar={onModalidadSeleccionada} onCancelar={cancelarFlujo} />;
+  } else if (state.matches("clase")) {
+    modal = (
       <SeleccionClase
         tipoAccion={state.context.tipoAccion}
         modalidad={state.context.modalidad}
         uidRetado={state.context.retadoUid}
         onConfirmar={onClaseConfirmada}
         onCancelar={cancelarFlujo}
+        onAtras={() => send({ type: "ATRAS" })}
       />
     );
-  }
-
-  if (state.matches("lobby_espera")) {
-    return (
+  } else if (state.matches("lobby_espera")) {
+    modal = (
       <LobbyEspera
         lobbyId={state.context.lobbyId}
         esReto={!!state.context.retadoUid}
+        modalidad={state.context.modalidad}
+        clase={state.context.clase}
         onCancelar={() => send({ type: "CANCELAR_BUSQUEDA" })}
         onCerrado={() => {
           alert("El lobby se cerró (rechazaron el reto o fue cancelado).");
@@ -217,16 +219,17 @@ export default function MenuPrincipal() {
         }}
       />
     );
-  }
-
-  if (state.matches("buscando")) {
-    return (
-      <div>
-        <p>Buscando partida en modalidad: {state.context.modalidad}...</p>
-        <button onClick={cancelarBusqueda}>Cancelar búsqueda</button>
-      </div>
+  } else if (state.matches("buscando")) {
+    modal = (
+      <BuscandoPartida
+        modalidad={state.context.modalidad}
+        clase={state.context.clase}
+        onCancelar={cancelarBusqueda}
+      />
     );
   }
+
+  if (modal) return modal;
 
   // --- Pantalla principal (diseño de GameMenu fusionado) ---
   const misiones = (profile?.misionesDiarias?.lista || []).map((m, index) => ({
@@ -264,7 +267,6 @@ export default function MenuPrincipal() {
         <div className="gm-footer-icons">
           <button className="gm-icon-btn" aria-label="Configuración">⚙️</button>
           <button className="gm-icon-btn" aria-label="Ayuda">❓</button>
-          <button className="gm-icon-btn" aria-label="Notificaciones">🔔</button>
         </div>
 
         <div
@@ -337,7 +339,7 @@ export default function MenuPrincipal() {
 
     {pantallaActiva === "inventario" && (
       <div className="gm-content-full">
-        <InventarioPage onVolver={volverAJugar} />
+        <InventarioPage onVolver={volverAJugar} onIrATienda={() => manejarNav("tienda")} />
       </div>
     )}
 

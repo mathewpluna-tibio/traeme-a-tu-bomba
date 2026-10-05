@@ -2,11 +2,13 @@ import { useEffect, useState } from "react";
 import { ref, onValue, onDisconnect } from "firebase/database";
 import { httpsCallable } from "firebase/functions";
 import { rtdb, functions } from "../../firebase/config";
+import { buscarModo, buscarClase } from "../menu/buscarPartidaConfig";
+import { PanelBuscar, VisualBomba } from "../menu/BuscarPartidaUI";
 import "./Lobby.css";
 
 const cancelarLobbyCallable = httpsCallable(functions, "cancelarLobby");
 
-export default function LobbyEspera({ lobbyId, esReto, onCancelar, onCerrado }) {
+export default function LobbyEspera({ lobbyId, esReto, modalidad, clase, onCancelar, onCerrado }) {
   const [copiado, setCopiado] = useState(false);
   const [cancelando, setCancelando] = useState(false);
   const enlace = `${window.location.origin}/?lobby=${lobbyId}`;
@@ -52,27 +54,40 @@ export default function LobbyEspera({ lobbyId, esReto, onCancelar, onCerrado }) 
     onCancelar();
   };
 
+  const modo = buscarModo(modalidad);
+  const claseBomba = buscarClase(clase);
+  const visual = claseBomba || modo;
+
   return (
-    <div className="lobby-pantalla">
-      <h2>Lobby privado</h2>
-      <p className="lobby-texto">
-        {esReto
-          ? "Reto enviado. Esperando a que el jugador acepte..."
-          : "Comparte este enlace con tu rival. La partida empieza en cuanto elija su clase."}
-      </p>
+    <PanelBuscar titulo="Crear lobby privado" paso="busqueda" conClase={!!modo?.tieneClase}>
+      <div className="sm-status">
+        <div className="sm-status-visual sm-status-visual--pulse">{visual && <VisualBomba item={visual} />}</div>
+        <h2 className="sm-status-title">{esReto ? "Reto enviado" : "Lobby creado"}</h2>
+        <p className="sm-status-text">
+          {esReto
+            ? "Esperando a que el jugador acepte el reto..."
+            : "Comparte el enlace con tu rival. La partida inicia cuando se una y elija su clase."}
+        </p>
 
-      <div className="lobby-enlace">
-        <input readOnly value={enlace} onFocus={(e) => e.target.select()} />
-        <button onClick={copiar}>{copiado ? "¡Copiado!" : "Copiar"}</button>
+        <div className="sm-chips">
+          {[modo, claseBomba].filter(Boolean).map((i) => (
+            <span key={i.id} className="sm-chip">{i.nombre}</span>
+          ))}
+        </div>
+
+        <div className="sm-invite">
+          <input className="sm-invite-input" type="text" readOnly value={enlace} onFocus={(e) => e.target.select()} />
+          <button className="sm-btn sm-btn--secondary" onClick={copiar}>
+            {copiado ? "¡Copiado!" : "Copiar"}
+          </button>
+        </div>
+
+        <p className="sm-status-text">El enlace deja de funcionar cuando inicia la partida o cancelas el lobby.</p>
+
+        <button className="sm-btn sm-btn--danger" onClick={cancelar} disabled={cancelando}>
+          Cancelar lobby
+        </button>
       </div>
-
-      <p className="lobby-nota">
-        El enlace deja de funcionar cuando inicia la partida o cancelas el lobby.
-      </p>
-
-      <button className="lobby-cancelar" onClick={cancelar} disabled={cancelando}>
-        Cancelar lobby
-      </button>
-    </div>
+    </PanelBuscar>
   );
 }

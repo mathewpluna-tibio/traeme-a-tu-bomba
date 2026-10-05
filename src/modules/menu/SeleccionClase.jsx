@@ -3,28 +3,22 @@ import { httpsCallable } from "firebase/functions";
 import { functions } from "../../firebase/config";
 import { useAuth } from "../../context/AuthContext";
 import { unirseACola } from "./matchmaking";
+import { CLASES_BOMBA } from "./buscarPartidaConfig";
+import { PanelBuscar, TarjetaBomba } from "./BuscarPartidaUI";
 
 const crearLobbyCallable = httpsCallable(functions, "crearLobby");
 
-// RQNF-MEN-03: identificador único por clase
-const CLASES = [
-  { id: "minibomba", nombre: "MiniBomba" },
-  { id: "bomba", nombre: "Bomba" },
-  { id: "bombota", nombre: "Bombota" },
-  { id: "aleatoria", nombre: "Aleatoria" },
-];
-
-export default function SeleccionClase({ tipoAccion, modalidad, uidRetado, onConfirmar, onCancelar }) {
+export default function SeleccionClase({ tipoAccion, modalidad, uidRetado, onConfirmar, onCancelar, onAtras }) {
+  const [claseId, setClaseId] = useState(null);
   const [confirmando, setConfirmando] = useState(false);
   const yaConfirmado = useRef(false); // evita que se busque dos veces partida
   const { user } = useAuth();
+  const esLobby = tipoAccion === "lobby";
 
-  const handleConfirmar = async (claseId) => {
-    if (yaConfirmado.current) return; // ignora cualquier segundo disparo
+  const handleConfirmar = async () => {
+    if (!claseId || yaConfirmado.current) return; // ignora cualquier segundo disparo
     yaConfirmado.current = true;
     setConfirmando(true);
-
-    console.log("Clase confirmada:", claseId, "Modalidad:", modalidad, "Acción:", tipoAccion);
 
     if (tipoAccion === "buscar") {
       await unirseACola(modalidad, user.uid, claseId, user.isAnonymous);
@@ -45,23 +39,23 @@ export default function SeleccionClase({ tipoAccion, modalidad, uidRetado, onCon
   };
 
   return (
-    <div className="seleccion-clase">
-      <h3>Elige tu clase de bomba</h3>
-      <div className="opciones-clases">
-        {CLASES.map((c) => (
-          <button
-            key={c.id}
-            data-clase-id={c.id}
-            onClick={() => handleConfirmar(c.id)}
-            disabled={confirmando}
-          >
-            {c.nombre}
-          </button>
+    <PanelBuscar
+      titulo={esLobby ? "Crear lobby privado" : "Buscar partida"}
+      paso="clase"
+      conClase
+      onAtras={confirmando ? null : onAtras || onCancelar}
+      pie={
+        <button className="sm-btn sm-btn--primary" onClick={handleConfirmar} disabled={!claseId || confirmando}>
+          {esLobby ? "Crear lobby" : "Buscar partida"}
+        </button>
+      }
+    >
+      <p className="sm-subtitle">Elige tu clase de bomba</p>
+      <div className="sm-card-grid sm-card-grid--4">
+        {CLASES_BOMBA.map((c) => (
+          <TarjetaBomba key={c.id} item={c} seleccionada={c.id === claseId} onSeleccionar={setClaseId} deshabilitada={confirmando} />
         ))}
       </div>
-      <button className="btn-volver" onClick={onCancelar} disabled={confirmando}>
-        Cancelar
-      </button>
-    </div>
+    </PanelBuscar>
   );
 }

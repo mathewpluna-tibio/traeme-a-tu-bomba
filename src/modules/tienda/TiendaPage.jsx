@@ -1,117 +1,110 @@
 import { useState } from "react";
+import { doc, updateDoc } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
-import { functions } from "../../firebase/config";
+import { db, functions } from "../../firebase/config";
+import { useAuth } from "../../context/AuthContext";
 import { useUserProfile } from "../../hooks/useUserProfile";
-import { MARCOS, BANNERS } from "../../data/cosmeticos";
-import "./TiendaPage.css";
+import { MARCOS, BANNERS, TITULOS, obtenerMarco, obtenerBanner } from "../../data/cosmeticos";
+import UserBomb from "../../assets/UserBomb.png";
+import Store from "./Store";
 
 const comprarCosmeticoCallable = httpsCallable(functions, "comprarCosmetico");
 
-const PESTANAS = [
-  { id: "marcos", label: "Marcos" },
-  { id: "banners", label: "Banners" },
+const CATEGORIAS = [
+  { id: "marco", label: "Marcos" },
+  { id: "banner", label: "Banners" },
+  { id: "titulo", label: "Títulos" },
 ];
 
 // Solo los que tienen precio se venden en la Tienda ("Default" ya lo
 // tiene todo mundo, "007" es exclusivo de Logros — ver cosmeticos.js).
-const marcosEnVenta = Object.values(MARCOS).filter((m) => m.precio != null);
-const bannersEnVenta = Object.values(BANNERS).filter((b) => b.precio != null);
+const enVenta = (catalogo, categoria) =>
+  Object.values(catalogo)
+    .filter((c) => c.precio != null)
+    .map((c) => ({
+      id: c.id,
+      category: categoria,
+      name: c.nombre,
+      rarity: c.rareza || "comun",
+      image: c.imagen,
+      holeRatio: c.holeRatio,
+      price: c.precio,
+    }));
+
+const MARCOS_VENTA = enVenta(MARCOS, "marco");
+const BANNERS_VENTA = enVenta(BANNERS, "banner");
+const TITULOS_VENTA = TITULOS.map((t) => ({
+  id: t.id, category: "titulo", name: t.id, rarity: t.rareza, price: t.precio,
+}));
 
 export default function TiendaPage({ onVolver }) {
+  const { user } = useAuth();
   const { profile, loading } = useUserProfile();
-  const [pestana, setPestana] = useState("marcos");
-  const [comprandoId, setComprandoId] = useState(null);
+  const [busyId, setBusyId] = useState(null);
   const [error, setError] = useState("");
 
   if (loading) return <p>Cargando...</p>;
   if (!profile) return <p>No se encontró tu perfil.</p>;
 
-  const coronas = profile.coronas || 0;
   const marcosPropios = new Set(profile.marcosComprados || []);
   const bannersPropios = new Set(profile.bannersComprados || []);
+  const titulosPropios = new Set(profile.titulosObtenidos || []);
+  const marcoActivoId = obtenerMarco(profile.marcoActivo).id;
+  const bannerActivoId = obtenerBanner(profile.bannerActivo).id;
 
-  const comprar = async (tipo, item) => {
-    if (comprandoId) return;
-    setComprandoId(item.id);
+  const items = [
+    ...MARCOS_VENTA.map((i) => ({ ...i, owned: marcosPropios.has(i.id), equipped: marcoActivoId === i.id })),
+    ...BANNERS_VENTA.map((i) => ({ ...i, owned: bannersPropios.has(i.id), equipped: bannerActivoId === i.id })),
+    ...TITULOS_VENTA.map((i) => ({ ...i, owned: titulosPropios.has(i.id), equipped: (profile.tituloActivo || "") === i.id })),
+  ];
+
+  const comprar = async (item) => {
+    if (busyId) return;
+    setBusyId(item.id);
     setError("");
     try {
-      await comprarCosmeticoCallable({ tipo, id: item.id });
+      await comprarCosmeticoCallable({ tipo: item.category, id: item.id });
     } catch (err) {
       console.error("Error al comprar cosmético:", err);
-      const mensaje =
+      setError(
         err.code === "functions/failed-precondition"
           ? "No tienes suficientes coronas."
           : err.code === "functions/already-exists"
           ? "Ya tienes este cosmético."
-          : "No se pudo completar la compra. Intenta de nuevo.";
-      setError(mensaje);
+          : "No se pudo completar la compra. Intenta de nuevo."
+      );
     } finally {
-      setComprandoId(null);
+      setBusyId(null);
     }
   };
 
-  const itemsActuales = pestana === "marcos" ? marcosEnVenta : bannersEnVenta;
-  const propios = pestana === "marcos" ? marcosPropios : bannersPropios;
-  const tipoActual = pestana === "marcos" ? "marco" : "banner";
-  const previewClase = pestana === "marcos" ? "tienda-marco-preview" : "tienda-banner-preview";
+  const equipar = async (item) => {
+    if (busyId) return;
+    setBusyId(item.id);
+    setError("");
+    try {
+      const campo = item.category === "marco" ? "marcoActivo" : item.category === "banner" ? "bannerActivo" : "tituloActivo";
+      await updateDoc(doc(db, "usuarios", user.uid), { [campo]: item.id });
+    } catch (err) {
+      console.error("Error al equipar cosmético:", err);
+      setError("No se pudo guardar el cambio. Intenta de nuevo.");
+    } finally {
+      setBusyId(null);
+    }
+  };
 
   return (
-    <div className="tienda-page">
-      {onVolver && (
-        <button className="tienda-volver" onClick={onVolver}>
-          ← Volver al menú
-        </button>
-      )}
-
-      <div className="tienda-encabezado">
-        <h2>Tienda</h2>
-        <div className="tienda-coronas">🪙 {coronas}</div>
-      </div>
-
-      {error && <p className="error-text">{error}</p>}
-
-      <div className="tienda-pestanas">
-        {PESTANAS.map((p) => (
-          <button
-            key={p.id}
-            className={`tienda-pestana ${pestana === p.id ? "activa" : ""}`}
-            onClick={() => setPestana(p.id)}
-          >
-            {p.label}
-          </button>
-        ))}
-      </div>
-
-      <div className="tienda-grid">
-        {itemsActuales.map((item) => {
-          const yaComprado = propios.has(item.id);
-          const alcanza = coronas >= item.precio;
-          const comprandoEste = comprandoId === item.id;
-
-          return (
-            <div key={item.id} className={`tienda-item ${yaComprado ? "tienda-item-poseido" : ""}`}>
-              {pestana === "marcos" ? (
-                <img src={item.imagen} alt={item.nombre} className={previewClase} />
-              ) : (
-                <div className={previewClase} style={{ backgroundImage: `url(${item.imagen})` }} />
-              )}
-              <p className="tienda-item-nombre">{item.nombre}</p>
-
-              {yaComprado ? (
-                <span className="tienda-item-poseido-texto">Ya lo tienes</span>
-              ) : (
-                <button
-                  className="tienda-item-comprar"
-                  onClick={() => comprar(tipoActual, item)}
-                  disabled={!alcanza || comprandoEste}
-                >
-                  {comprandoEste ? "Comprando..." : `🪙 ${item.precio}`}
-                </button>
-              )}
-            </div>
-          );
-        })}
-      </div>
-    </div>
+    <Store
+      coins={profile.coronas || 0}
+      items={items}
+      categories={CATEGORIAS}
+      avatar={profile.fotoPerfil || UserBomb}
+      username={profile.username || "Tú"}
+      error={error}
+      busyId={busyId}
+      onBuy={comprar}
+      onEquip={equipar}
+      onBack={onVolver}
+    />
   );
 }

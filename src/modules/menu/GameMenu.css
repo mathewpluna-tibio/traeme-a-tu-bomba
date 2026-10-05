@@ -16,7 +16,8 @@
   color: var(--gm-text-light);
   display: grid;
   grid-template-columns: 220px 1fr 300px;
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
 }
 
 .gm-app * {
@@ -297,6 +298,7 @@
 
 .gm-content-full {
   flex: 1;
+  min-height: 0;
   padding: 24px;
   overflow-y: auto;
 }
@@ -494,3 +496,9 @@
   line-height: 18px;
   text-align: center;
 }
+/* Las barras laterales no se estiran con el contenido: el centro hace scroll */
+.gm-sidebar { min-height: 0; overflow-y: auto; }
+.gm-main-panel { min-height: 0; overflow-y: auto; }
+.gm-content-full { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.25) transparent; }
+.gm-content-full::-webkit-scrollbar { width: 10px; }
+.gm-content-full::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.25); border-radius: 8px; }

@@ -136,3 +136,25 @@
   display: flex;
   gap: 8px;
 }
+/* Botones de clase con imagen de bomba (LobbyEntrante) */
+.lobby-clase {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+.lobby-clase-img {
+  width: 56px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.lobby-clase-img img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.lobby-clase-img .sm-card-emoji {
+  font-size: 40px;
+}

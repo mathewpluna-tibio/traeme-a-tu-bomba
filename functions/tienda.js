@@ -18,15 +18,36 @@ const { onCall, HttpsError } = require("firebase-functions/v2/https");
  * misionesCatalogo.js y logrosCatalogo.js).
  */
 const CATALOGO_TIENDA = [
-  { tipo: "marco", id: "Metal", precio: 100 },
-  { tipo: "marco", id: "Nat", precio: 100 },
+  // Marcos
+  { tipo: "marco", id: "Metal", precio: 75 },
+  { tipo: "marco", id: "Nat", precio: 50 },
   { tipo: "marco", id: "Electro", precio: 100 },
   { tipo: "marco", id: "Dino", precio: 100 },
-  { tipo: "banner", id: "Metal", precio: 100 },
-  { tipo: "banner", id: "Nat", precio: 100 },
+  // Banners
+  { tipo: "banner", id: "Metal", precio: 75 },
+  { tipo: "banner", id: "Nat", precio: 50 },
   { tipo: "banner", id: "Electro", precio: 100 },
   { tipo: "banner", id: "Dino", precio: 100 },
+  // Títulos (el id es el texto del título). Espejo: TITULOS en src/data/cosmeticos.js
+  { tipo: "titulo", id: "Agente Doble", precio: 100 },
+  { tipo: "titulo", id: "Licencia para Ganar", precio: 100 },
+  { tipo: "titulo", id: "As Bajo la Manga", precio: 100 },
+  { tipo: "titulo", id: "Rey del Jurásico", precio: 75 },
+  { tipo: "titulo", id: "Depredador Alfa", precio: 75 },
+  { tipo: "titulo", id: "Fósil Viviente", precio: 75 },
+  { tipo: "titulo", id: "Sobrecarga", precio: 75 },
+  { tipo: "titulo", id: "Circuito Maestro", precio: 75 },
+  { tipo: "titulo", id: "Alto Voltaje", precio: 75 },
+  { tipo: "titulo", id: "Riesgo Nuclear", precio: 50 },
+  { tipo: "titulo", id: "Guardián del Bosque", precio: 25 },
+  { tipo: "titulo", id: "Espíritu Silvestre", precio: 25 },
 ];
+
+const CAMPO_POR_TIPO = {
+  marco: "marcosComprados",
+  banner: "bannersComprados",
+  titulo: "titulosObtenidos",
+};
 
 const comprarCosmetico = onCall(async (request) => {
   const uid = request.auth?.uid;
@@ -35,7 +56,7 @@ const comprarCosmetico = onCall(async (request) => {
   }
 
   const { tipo, id } = request.data || {};
-  if (!id || (tipo !== "marco" && tipo !== "banner")) {
+  if (!id || !CAMPO_POR_TIPO[tipo]) {
     throw new HttpsError("invalid-argument", "Cosmético inválido.");
   }
 
@@ -46,7 +67,7 @@ const comprarCosmetico = onCall(async (request) => {
 
   const firestore = getFirestore();
   const perfilRef = firestore.collection("usuarios").doc(uid);
-  const campoLista = tipo === "marco" ? "marcosComprados" : "bannersComprados";
+  const campoLista = CAMPO_POR_TIPO[tipo];
 
   // Transacción: así dos clics rápidos (o dos pestañas) no pueden gastar
   // las mismas coronas dos veces ni comprar el mismo item dos veces.

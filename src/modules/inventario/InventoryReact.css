@@ -1,0 +1,539 @@
+@import url("https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Nunito:wght@600;700;800&display=swap");
+
+.iv-page {
+  --bg-dark: #0a0a0f;
+  --card-dark: #1c1d27;
+  --card-dark-2: #23242f;
+  --orange: #ff7a1a;
+  --orange-2: #ff9633;
+  --gold: #ffd166;
+  --purple-1: #4b3cc9;
+  --purple-2: #7d5be0;
+  --text-light: #f4f4f8;
+  --text-muted: #9a9aab;
+  --border-soft: rgba(255, 255, 255, 0.08);
+  --font-display: "Baloo 2", sans-serif;
+  --font-body: "Nunito", sans-serif;
+
+  /* Colores de rareza (mismos que la Tienda, para que se sientan la misma app) */
+  --r-comun: #9aa3b5;
+  --r-raro: #3b9bff;
+  --r-epico: #b969f0;
+  --r-legendario: #ffb703;
+  color: var(--text-light);
+  font-family: var(--font-body);
+
+  position: relative;
+  min-height: 100%;
+  text-align: left;
+  overflow-x: hidden;
+}
+
+.iv-glow {
+  position: fixed;
+  width: 520px;
+  height: 520px;
+  border-radius: 50%;
+  display: none; /* sin blur: evita lentitud */
+  opacity: 0.22;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.iv-glow--1 {
+  background: var(--purple-2);
+  top: -180px;
+  left: -120px;
+}
+
+.iv-glow--2 {
+  background: var(--orange);
+  bottom: -220px;
+  right: -140px;
+}
+
+.iv-container {
+  position: relative;
+  z-index: 1;
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: 28px 24px 64px;
+}
+
+.iv-back {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font-family: inherit;
+  display: inline-block;
+  color: var(--text-muted);
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 700;
+  margin-bottom: 20px;
+  transition: color 0.15s ease;
+}
+
+.iv-back:hover {
+  color: var(--text-light);
+}
+
+/* ===================== HEADER ===================== */
+
+.iv-header {
+  margin-bottom: 24px;
+}
+
+.iv-page .iv-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 32px;
+  font-weight: 800;
+  background: linear-gradient(135deg, #fff, #c9c3ff);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.iv-subtitle {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+/* ===================== TABS ===================== */
+
+.iv-tabs {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 28px;
+  flex-wrap: wrap;
+}
+
+.iv-tab {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 20px;
+  border-radius: 12px;
+  border: 1px solid var(--border-soft);
+  background: var(--card-dark);
+  color: var(--text-muted);
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.iv-tab:hover {
+  color: var(--text-light);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.iv-tab-icon {
+  font-size: 15px;
+}
+
+.iv-tab--active {
+  background: linear-gradient(135deg, var(--purple-1), var(--purple-2));
+  color: #fff;
+  border-color: transparent;
+  box-shadow: 0 6px 16px rgba(123, 91, 224, 0.35);
+}
+
+/* ===================== GRID DE COSMÉTICOS ===================== */
+
+.iv-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 20px;
+}
+
+.iv-card {
+  position: relative;
+  background: var(--card-dark);
+  border: 1px solid var(--border-soft);
+  border-radius: 18px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  cursor: pointer;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+  overflow: hidden;
+}
+
+.iv-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 3px;
+  background: var(--rarity-color, var(--r-comun));
+}
+
+.iv-card:hover {
+  transform: translateY(-5px);
+  border-color: var(--rarity-color, var(--border-soft));
+  box-shadow: 0 14px 28px rgba(0, 0, 0, 0.35), 0 0 0 1px var(--rarity-color, transparent);
+}
+
+.iv-card--equipped {
+  border-color: var(--rarity-color, var(--orange-2));
+  box-shadow: 0 0 0 1px var(--rarity-color, var(--orange-2)) inset;
+}
+
+.iv-card--legendario {
+  background: linear-gradient(160deg, rgba(255, 183, 3, 0.08), var(--card-dark) 60%);
+}
+
+.iv-card--legendario::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(120deg, transparent 30%, rgba(255, 209, 102, 0.18) 50%, transparent 70%);
+  background-size: 200% 100%;
+  pointer-events: none;
+}
+
+@keyframes iv-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+.iv-card-visual {
+  position: relative;
+  height: 110px;
+  border-radius: 12px;
+  background: radial-gradient(circle at 50% 30%, color-mix(in srgb, var(--rarity-color, var(--r-comun)) 25%, transparent), transparent 70%),
+    var(--card-dark-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.iv-card-visual--marco img {
+  width: 88px;
+  height: 88px;
+  object-fit: contain;
+}
+
+.iv-card-visual--banner {
+  padding: 0;
+}
+
+.iv-card-visual--banner img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.iv-card-visual--titulo .iv-title-chip {
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 700;
+  color: #10131a;
+  background: var(--rarity-color, var(--r-comun));
+  padding: 8px 18px;
+  border-radius: 999px;
+  text-align: center;
+  max-width: 90%;
+}
+
+.iv-card-emoji {
+  font-size: 40px;
+}
+
+.iv-rarity-tag {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  font-size: 9px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.55);
+  color: var(--rarity-color, var(--r-comun));
+  border: 1px solid var(--rarity-color, var(--r-comun));
+}
+
+.iv-card-name {
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.iv-card-footer {
+  display: flex;
+  justify-content: center;
+}
+
+.iv-equip-pill,
+.iv-equipped-pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 16px;
+  border-radius: 999px;
+  font-weight: 800;
+  font-size: 12px;
+  width: 100%;
+  justify-content: center;
+}
+
+.iv-equip-pill {
+  background: linear-gradient(135deg, var(--orange-2), var(--orange));
+  color: #fff;
+}
+
+.iv-equipped-pill {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: var(--text-muted);
+}
+
+/* ===================== ESTADO VACÍO ===================== */
+
+.iv-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 10px;
+  padding: 60px 20px;
+  background: var(--card-dark);
+  border: 1px dashed var(--border-soft);
+  border-radius: 18px;
+}
+
+.iv-empty-icon {
+  font-size: 32px;
+  opacity: 0.7;
+}
+
+.iv-empty-title {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.iv-empty-text {
+  font-size: 13px;
+  color: var(--text-muted);
+  max-width: 320px;
+}
+
+/* ===================== MODAL DE VISTA PREVIA ===================== */
+
+.iv-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(5, 5, 10, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  padding: 20px;
+}
+
+.iv-modal-backdrop[hidden] {
+  display: none;
+}
+
+.iv-modal {
+  position: relative;
+  width: 100%;
+  max-width: 400px;
+  background: linear-gradient(165deg, #241c66 0%, #4a37c2 60%, #7c5be0 100%);
+  border-radius: 22px;
+  padding: 28px 24px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  box-shadow: 0 30px 60px rgba(0, 0, 0, 0.5);
+}
+
+.iv-modal-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.iv-modal-close:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.iv-page .iv-modal-title {
+  margin: 0;
+  color: #fff;
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.iv-preview {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  background: rgba(10, 10, 15, 0.3);
+  border-radius: 16px;
+  padding: 24px 16px;
+  min-height: 150px;
+  justify-content: center;
+}
+
+.iv-preview-avatar-wrap {
+  position: relative;
+  width: 84px;
+  height: 84px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.iv-preview-avatar {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: #14151c;
+  z-index: 1;
+}
+
+.iv-preview-frame {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.iv-preview-username {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 15px;
+}
+
+.iv-preview-banner {
+  width: 100%;
+  height: 72px;
+  border-radius: 10px;
+  object-fit: cover;
+}
+
+.iv-preview-title-chip {
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 700;
+  color: #10131a;
+  padding: 4px 14px;
+  border-radius: 999px;
+  background: var(--gold);
+}
+
+.iv-modal-info {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.iv-modal-name {
+  font-weight: 800;
+  font-size: 15px;
+}
+
+.iv-rarity-badge {
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.iv-modal-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.iv-btn {
+  flex: 1;
+  padding: 13px;
+  border-radius: 10px;
+  border: none;
+  font-family: var(--font-body);
+  font-weight: 800;
+  font-size: 13px;
+  cursor: pointer;
+  text-decoration: none;
+  text-align: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: filter 0.12s ease, opacity 0.12s ease;
+}
+
+.iv-btn:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+.iv-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.iv-btn--primary {
+  background: linear-gradient(180deg, var(--orange-2), var(--orange));
+  color: #fff;
+}
+
+.iv-btn--secondary {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+}
+
+@media (max-width: 520px) {
+  .iv-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.iv-page *,
+.iv-page *::before,
+.iv-page *::after {
+  box-sizing: border-box;
+}
+
+.iv-page .iv-error { color: #ff8a73; font-size: 14px; margin: 0 0 16px; text-align: center; }
+.iv-page p { margin: 0; }
+
+/* Los botones heredan el color del texto claro (si no, salen negros) */
+.iv-page button { color: inherit; font-family: inherit; }
+.iv-page .iv-card { color: var(--text-light); }
+.iv-page .iv-preview-frame { width: 100%; height: 100%; object-fit: contain; border-radius: 0; pointer-events: none; z-index: 2; }
+.iv-page .iv-preview-avatar { position: relative; }
+
+/* Imágenes de cosméticos como fondo (sin <img> roto ni texto alternativo) */
+.iv-page .iv-card-img { background-repeat: no-repeat; background-position: center; background-size: contain; }
+.iv-page .iv-card-visual--marco .iv-card-img { width: 88px; height: 88px; }
+.iv-page .iv-card-visual--banner .iv-card-img { width: 100%; height: 100%; background-size: cover; }
+.iv-page .iv-preview-frame { background-repeat: no-repeat; background-position: center; background-size: contain; }
+.iv-page .iv-preview-banner { background-repeat: no-repeat; background-position: center; background-size: cover; }
+/* La etiqueta de rareza va por encima del recuadro de la imagen */
+.iv-page .iv-rarity-tag { z-index: 3; }

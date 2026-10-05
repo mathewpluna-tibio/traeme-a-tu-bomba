@@ -3,7 +3,9 @@ import { ref, onValue } from "firebase/database";
 import { httpsCallable } from "firebase/functions";
 import { rtdb, functions } from "../../firebase/config";
 import { useAuth } from "../../context/AuthContext";
-import { CLASES, NOMBRE_MODALIDAD } from "./lobbyConfig";
+import { NOMBRE_MODALIDAD } from "./lobbyConfig";
+import { CLASES_BOMBA } from "../menu/buscarPartidaConfig";
+import { VisualBomba } from "../menu/BuscarPartidaUI";
 import "./Lobby.css";
 
 const unirseALobbyCallable = httpsCallable(functions, "unirseALobby");
@@ -82,8 +84,9 @@ export default function LobbyEntrante({ lobbyId, onCerrar }) {
               <>
                 <p className="lobby-texto">Elige tu clase de bomba para empezar:</p>
                 <div className="lobby-clases">
-                  {CLASES.map((c) => (
-                    <button key={c.id} className="lobby-btn" disabled={uniendose} onClick={() => unirse(c.id)}>
+                  {CLASES_BOMBA.map((c) => (
+                    <button key={c.id} className="lobby-btn lobby-clase" disabled={uniendose} onClick={() => unirse(c.id)}>
+                      <span className="lobby-clase-img"><VisualBomba item={c} /></span>
                       {c.nombre}
                     </button>
                   ))}

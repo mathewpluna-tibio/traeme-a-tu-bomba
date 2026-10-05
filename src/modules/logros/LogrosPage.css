@@ -102,3 +102,4 @@
   text-align: right;
   color: #000000;
 }
+.logros-page h2 { color: var(--gm-text-light, #f4f4f8); }

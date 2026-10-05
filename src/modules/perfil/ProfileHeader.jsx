@@ -1,6 +1,6 @@
 import "./avatar.css";
 import UserBomb from "../../assets/UserBomb.png";
-import { obtenerMarco, obtenerBanner } from "../../data/cosmeticos";
+import { obtenerMarco, obtenerBanner, tituloVisible } from "../../data/cosmeticos";
 
 const FRAME_SIZE = 140; 
 const FACTOR_RELLENO = 1.18;
@@ -41,9 +41,7 @@ export default function ProfileHeader({
       <div className="pf-identity">
         <h1 className="pf-username">{profile.username}</h1>
         {/* RQF-PER-04: título activo debajo del nombre */}
-        {profile.tituloActivo && (
-          <span className="pf-title-banner">{profile.tituloActivo}</span>
-        )}
+        <span className="pf-title-banner">{tituloVisible(profile)}</span>
         {/* ID único: es el que se usa para buscar a un jugador (RQF-SOC-01) */}
         <button
           className="pf-id"
