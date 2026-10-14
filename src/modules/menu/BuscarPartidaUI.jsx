@@ -22,7 +22,7 @@ export function TarjetaBomba({ item, seleccionada, onSeleccionar, deshabilitada 
       </div>
       <span className="sm-card-name">{item.nombre}</span>
       <span className="sm-card-desc">{item.desc}</span>
-      {item.detalle && <span className="sm-card-detail">{item.detalle}</span>}
+      {item.detalle && <span className="sm-card-detail">Kit inicial: {item.detalle}</span>}
     </button>
   );
 }

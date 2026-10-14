@@ -18,6 +18,9 @@ import MisionesPage from "../misiones/MisionesPage";
 import LogrosPage from "../logros/LogrosPage";
 import InventarioPage from "../inventario/InventarioPage";
 import TiendaPage from "../tienda/TiendaPage";
+import EventoPage from "../eventos/EventoPage";
+import { useEventos } from "../../hooks/useEventos";
+import { formatoRestante } from "../eventos/eventosConfig";
 import AmigosPage from "../amigos/AmigosPage";
 import LobbyEspera from "../lobby/LobbyEspera";
 import LobbyEntrante from "../lobby/LobbyEntrante";
@@ -43,6 +46,7 @@ const NAV_ITEMS = [
 export default function MenuPrincipal() {
   const { user, cerrarSesion } = useAuth();
   const { profile } = useUserProfile();
+  const { activo: eventoActivo, ahora: ahoraEvento } = useEventos();
   const { partidaId, limpiarNotificacion } = useNotificacionPartida();
   const [state, send] = useMachine(menuMachine);
   const [navActivo, setNavActivo] = useState("buscar");
@@ -173,6 +177,8 @@ export default function MenuPrincipal() {
       setPantallaActiva("tienda");
     } else if (id === "amigos") {
       setPantallaActiva("amigos");
+    } else if (id === "evento") {
+      setPantallaActiva("evento");
     }
   };
 
@@ -354,6 +360,12 @@ export default function MenuPrincipal() {
       </div>
     )}
 
+    {pantallaActiva === "evento" && (
+      <div className="gm-content-full">
+        <EventoPage onVolver={volverAJugar} />
+      </div>
+    )}
+
     {pantallaActiva === "tienda" && (
       <div className="gm-content-full">
         <TiendaPage onVolver={volverAJugar} />
@@ -397,15 +409,27 @@ export default function MenuPrincipal() {
           </h2>
         </header>
 
-        <div className="gm-empty-event">
-          <span className="gm-empty-event-icon">🗓️</span>
-          <p className="gm-empty-event-title">No existe un evento activo</p>
-          <p className="gm-empty-event-text">
-            No existe un evento en este momento.
-            <br />
-            ¡Vuelve más tarde para unirte al caos de las bombas!
-          </p>
-        </div>
+        {eventoActivo ? (
+          <button type="button" className="gm-event-card" onClick={() => manejarNav("evento")}>
+            <span className="gm-event-name">{eventoActivo.nombre}</span>
+            <span className="gm-event-meta">
+              {eventoActivo.misiones.filter((m) => profile?.progresoEventos?.[eventoActivo.id]?.misiones?.[m.id]?.completada).length}
+              {" / "}
+              {eventoActivo.misiones.length} misiones · termina en {formatoRestante(eventoActivo.fin - ahoraEvento)}
+            </span>
+            <span className="gm-event-cta">Ver misiones y recompensas</span>
+          </button>
+        ) : (
+          <div className="gm-empty-event">
+            <span className="gm-empty-event-icon">🗓️</span>
+            <p className="gm-empty-event-title">No existe un evento activo</p>
+            <p className="gm-empty-event-text">
+              No existe un evento en este momento.
+              <br />
+              ¡Vuelve más tarde para unirte al caos de las bombas!
+            </p>
+          </div>
+        )}
       </section>
     </aside>
   </div>

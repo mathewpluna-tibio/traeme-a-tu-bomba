@@ -155,6 +155,11 @@ exports.crearLobby = require("./lobby").crearLobby;
 exports.cancelarLobby = require("./lobby").cancelarLobby;
 exports.rechazarReto = require("./lobby").rechazarReto;
 exports.unirseALobby = require("./lobby").unirseALobby;
+exports.guardarEvento = require("./admin").guardarEvento;
+exports.eliminarEvento = require("./admin").eliminarEvento;
+exports.banearUsuario = require("./admin").banearUsuario;
+exports.forzarCambioNombre = require("./admin").forzarCambioNombre;
+exports.cerrarEventosVencidos = require("./eventos").cerrarEventosVencidos;
 
 //TRIGGER MATCHMAKING - RECIBE CADA VEZ QUE CAMBIA LA COLA
 

@@ -21,6 +21,14 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Eventos temporales: los ven todos los jugadores; solo se crean,
+    // editan o eliminan desde Cloud Functions (guardarEvento / eliminarEvento,
+    // que exigen el rol admin).
+    match /eventos/{id} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+
     match /preferencias/{uid} {
       allow read, write: if request.auth != null && request.auth.uid == uid;
     }

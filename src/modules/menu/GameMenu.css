@@ -502,3 +502,22 @@
 .gm-content-full { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.25) transparent; }
 .gm-content-full::-webkit-scrollbar { width: 10px; }
 .gm-content-full::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.25); border-radius: 8px; }
+/* Panel lateral: evento activo */
+.gm-event-card {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  text-align: left;
+  padding: 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 150, 51, 0.45);
+  background: linear-gradient(160deg, rgba(255, 150, 51, 0.14), var(--gm-card-dark, #1c1d27));
+  color: var(--gm-text-light, #f4f4f8);
+  font-family: inherit;
+  cursor: pointer;
+}
+.gm-event-card:hover { border-color: #ff9633; }
+.gm-event-name { font-family: var(--gm-font-display, "Baloo 2", sans-serif); font-size: 17px; font-weight: 800; }
+.gm-event-meta { font-size: 12px; color: var(--gm-text-muted, #9a9aab); }
+.gm-event-cta { font-size: 12px; font-weight: 800; color: #ff9633; }

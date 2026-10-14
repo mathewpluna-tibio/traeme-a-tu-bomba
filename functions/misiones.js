@@ -1,5 +1,6 @@
 const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 const { MISIONES_DIARIAS, LOGROS } = require("./misionesCatalogo");
+const { obtenerEventosActivos } = require("./eventos");
 
 /** Acumula en `totales` la recompensa de un logro que se acaba de
  * desbloquear. Compartido por los 3 mecanismos de progreso (aditivo,
@@ -9,6 +10,17 @@ function acumularRecompensas(logro, totales) {
   if (logro.tituloDesbloqueado) totales.titulos.push(logro.tituloDesbloqueado);
   if (logro.marcoDesbloqueado) totales.marcos.push(logro.marcoDesbloqueado);
   if (logro.bannerDesbloqueado) totales.banners.push(logro.bannerDesbloqueado);
+}
+
+/** Recompensa de una misión de evento (coronas + cosmético exclusivo). */
+function acumularRecompensaEvento(recompensa, totales) {
+  if (!recompensa) return;
+  if (recompensa.coronas) totales.coronas += recompensa.coronas;
+  const c = recompensa.cosmetico;
+  if (!c) return;
+  if (c.tipo === "titulo") totales.titulos.push(c.id);
+  else if (c.tipo === "marco") totales.marcos.push(c.id);
+  else if (c.tipo === "banner") totales.banners.push(c.id);
 }
 
 function aplicarTotalesAActualizaciones(totales, actualizaciones) {
@@ -107,6 +119,32 @@ async function registrarProgreso(uid, tipoEvento, cantidad = 1) {
     };
 
     if (desbloqueadoAhora) acumularRecompensas(logro, totales);
+  }
+
+  // --- Eventos temporales (RQF-MIS-04) ---
+  // Solo cuenta el progreso mientras el evento está activo; las recompensas
+  // se entregan en el momento de completar la misión, nunca después de que
+  // el evento termine (RQNF-MIS-03).
+  try {
+    const eventosActivos = await obtenerEventosActivos();
+    for (const evento of eventosActivos) {
+      const progresoEvento = datos.progresoEventos?.[evento.id]?.misiones || {};
+      for (const m of evento.misiones || []) {
+        if (m.tipo !== tipoEvento) continue;
+        const previo = progresoEvento[m.id] || { progreso: 0, completada: false };
+        if (previo.completada) continue;
+        const nuevoProgreso = Math.min(m.objetivo, previo.progreso + cantidad);
+        const completadaAhora = nuevoProgreso >= m.objetivo;
+        actualizaciones[`progresoEventos.${evento.id}.misiones.${m.id}`] = {
+          progreso: nuevoProgreso,
+          completada: completadaAhora,
+        };
+        if (completadaAhora) acumularRecompensaEvento(m.recompensa, totales);
+      }
+    }
+  } catch (err) {
+    // Un fallo en eventos nunca debe romper el progreso normal.
+    console.error("[Misiones] Error al registrar progreso de evento:", err);
   }
 
   aplicarTotalesAActualizaciones(totales, actualizaciones);

@@ -27,6 +27,8 @@ export default function LoginForm({ onBack, onSuccess }) {
         setError("Correo o contraseña incorrectos.");
       } else if (err.code === "auth/invalid-email") {
         setError("El correo electrónico no es válido.");
+      } else if (err.code === "auth/user-disabled") {
+        setError("Esta cuenta fue suspendida por un administrador.");
       } else if (err.code === "auth/too-many-requests") {
         setError("Demasiados intentos. Espera un momento e inténtalo de nuevo.");
       } else {

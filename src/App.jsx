@@ -6,12 +6,15 @@ import MenuPrincipal from "./modules/menu/MenuPrincipal";
 import PerfilPage from "./modules/perfil/PerfilPage";
 import RankingsPage from "./modules/rankings/RankingsPage";
 import MisionesPage from "./modules/misiones/MisionesPage";
+import AdminPage from "./modules/admin/AdminPage";
+import { useBaneo } from "./hooks/useBaneo";
 
 function App() {
-  const { user, loading } = useAuth();
+  const { user, isAdmin, loading } = useAuth();
   const [vista, setVista] = useState("jugar"); // "jugar" | "perfil" | "rankings"
 
   useSesionUnica();
+  useBaneo();
 
   if (loading) return <p>Cargando...</p>;
 
@@ -22,7 +25,9 @@ function App() {
           autenticarse, solo desaparece cuando `user` deja de ser null. */}
       {!user && <WelcomeModal />}
 
-      {user && (
+      {user && isAdmin && <AdminPage />}
+
+      {user && !isAdmin && (
         <>
           {vista === "jugar" && <MenuPrincipal />}
           {vista === "perfil" && <PerfilPage />}

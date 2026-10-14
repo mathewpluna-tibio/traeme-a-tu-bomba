@@ -45,7 +45,7 @@ export const CLASES_BOMBA = [
   { id: "bomba", nombre: "Bomba", desc: "El equilibrio perfecto.", detalle: "5 bombas · -1 vida", imagen: imgBomba, emoji: "💣" },
   { id: "bombota", nombre: "Bombota", desc: "Pocas bombas, daño devastador.", detalle: "3 bombas · -1.5 vidas", imagen: imgBombota, emoji: "🧨" },
   // Sin ilustración propia todavía: ícono "?" dibujado en SVG.
-  { id: "aleatoria", nombre: "Aleatoria", desc: "Que decida la suerte.", detalle: "Se asigna al azar", imagen: iconoAleatoria, emoji: "?" },
+  { id: "aleatoria", nombre: "Aleatoria", desc: "Que decida la suerte.", detalle: "Se asigna una clase al azar", imagen: iconoAleatoria, emoji: "?" },
 ];
 
 export const buscarModo = (id) => MODOS.find((m) => m.id === id);
