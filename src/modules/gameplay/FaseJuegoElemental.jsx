@@ -4,6 +4,9 @@ import { functions } from "../../firebase/config";
 import { useAuth } from "../../context/AuthContext";
 import { useServerTimeOffset } from "../../hooks/useServerTimeOffset";
 import TableroElemental from "./TableroElemental";
+import HudPartida from "./HudPartida";
+import { useProgresoRelleno } from "./efectos/useProgresoRelleno";
+import { IMAGEN_BOMBA } from "./bombasAssets";
 import {
   casillasPropiasDisponibles,
   objetivosElectrica,
@@ -16,12 +19,49 @@ const usarBombaElementalCallable = httpsCallable(functions, "usarBombaElemental"
 const verificarTimeoutTurnoElementalCallable = httpsCallable(functions, "verificarTimeoutTurnoElemental");
 
 const NOMBRES_BOMBA = {
-  electrica: { nombre: "Eléctrica", icono: "⚡" },
-  lianas: { nombre: "Lianas", icono: "🌿" },
-  hielo: { nombre: "Hielo", icono: "❄️" },
+  electrica: { nombre: "Eléctrica", imagen: IMAGEN_BOMBA.electrica },
+  lianas: { nombre: "Lianas", imagen: IMAGEN_BOMBA.lianas },
+  hielo: { nombre: "Hielo", imagen: IMAGEN_BOMBA.hielo },
 };
 
-export default function FaseJuegoElemental({ partidaId, partida }) {
+// Bombas elementales que le quedan a un jugador, con su propio título para
+// no confundirlas con el marcador de casillas.
+function ExtraElemental({ jugador }) {
+  return (
+    <div className="gp-extra gp-extra--bombas">
+      <span className="gp-extra-titulo">Bombas</span>
+      <div className="gp-extra-fila">
+        {Object.entries(NOMBRES_BOMBA).map(([tipo, { nombre, imagen }]) => (
+          <img
+            key={tipo}
+            className={"gp-extra-img" + (jugador.bombas?.[tipo] ? "" : " gp-extra-img--usada")}
+            src={imagen}
+            alt={nombre}
+            title={jugador.bombas?.[tipo] ? nombre : `${nombre} (usada)`}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// Marcador central: casillas marcadas de cada jugador (el color es el de su territorio).
+function MarcadorCasillas({ yo, rival, pendientesYo = 0, pendientesRival = 0 }) {
+  const numeroYo = Math.max(0, (yo.casillasMarcadas || 0) - pendientesYo);
+  const numeroRival = Math.max(0, (rival.casillasMarcadas || 0) - pendientesRival);
+  return (
+    <div className="gp-marcador" title="Casillas marcadas">
+      <span className="gp-marcador-titulo">Casillas marcadas</span>
+      <div className="gp-marcador-fila">
+        <span className={`gp-marcador-num gp-marcador-num--${yo.color}`}>{numeroYo}</span>
+        <span className="gp-marcador-sep">:</span>
+        <span className={`gp-marcador-num gp-marcador-num--${rival.color}`}>{numeroRival}</span>
+      </div>
+    </div>
+  );
+}
+
+export default function FaseJuegoElemental({ partidaId, partida, perfiles = {} }) {
   const { user } = useAuth();
   const offset = useServerTimeOffset();
 
@@ -56,7 +96,7 @@ export default function FaseJuegoElemental({ partidaId, partida }) {
       setSegundosRestantes(null);
       return;
     }
-    const intervalo = setInterval(() => {
+    const tick = () => {
       const restante = Math.max(0, Math.ceil((finalizaEn - (Date.now() + offset)) / 1000));
       setSegundosRestantes(restante);
       // Mientras mi propia jugada está en camino no pido el timeout: el
@@ -66,7 +106,9 @@ export default function FaseJuegoElemental({ partidaId, partida }) {
           console.error("Error verificando timeout de turno:", err)
         );
       }
-    }, 1000);
+    };
+    setSegundosRestantes(Math.max(0, Math.ceil((finalizaEn - (Date.now() + offset)) / 1000)));
+    const intervalo = setInterval(tick, 1000);
     return () => clearInterval(intervalo);
   }, [finalizaEn, partidaId, offset]);
 
@@ -221,87 +263,95 @@ export default function FaseJuegoElemental({ partidaId, partida }) {
 
   const mensajeModo = {
     null: "Toca una casilla libre junto a tu territorio para marcarla.",
-    electrica: "Eléctrica armada: toca el centro de la cruz (roba casillas del rival alrededor).",
-    hielo: "Hielo armado: toca la casilla propia que quieres marcar. El rival perderá su próximo turno.",
+    electrica: "Eléctrica: toca el centro de la cruz (roba casillas del rival alrededor).",
+    hielo: "Hielo: toca la casilla que quieres marcar. El rival perderá su próximo turno.",
     "lianas-paso1": "Lianas: primero toca la casilla propia que quieres marcar.",
-    "lianas-paso2": `Lianas: elige 3 casillas junto al rival para bloquear — se aplica sola al elegir la tercera (${bloqueoSeleccionado.length}/3).`,
+    "lianas-paso2": `Lianas: elige 3 casillas junto al rival para bloquear (${bloqueoSeleccionado.length}/3). Se aplica al elegir la tercera.`,
   }[modo === null ? "null" : modo];
 
+  const rivalCongelado = (rivalJugador.congeladoPorTurnos || 0) > 0;
+
+  // Relleno final: cuando alguien ya no puede moverse, el servidor rellena las
+  // casillas restantes para el otro y aquí se anima casilla por casilla.
+  const { rellenando, progreso, total: totalRelleno } = useProgresoRelleno(partida.relleno, offset);
+  const pendientes = rellenando ? totalRelleno - Math.min(progreso, totalRelleno) : 0;
+  const yoRellena = partida.relleno?.uid === uid;
+
   return (
-    <div className="fase-juego-elemental">
-      <div className="elemental-marcador">
-        <span className={`elemental-marcador-color elemental-marcador-${miJugador.color}`}>
-          Tú: {miJugador.casillasMarcadas || 0}
-        </span>
-        <span className={`elemental-marcador-color elemental-marcador-${rivalJugador.color}`}>
-          Rival: {rivalJugador.casillasMarcadas || 0}
-        </span>
+    <>
+      <HudPartida
+        titulo="Bombas Elementales"
+        fase={rellenando ? "Relleno final" : esMiTurno ? "Tu turno" : "Turno del rival"}
+        segundos={segundosRestantes}
+        centro={
+          <MarcadorCasillas
+            yo={miJugador}
+            rival={rivalJugador}
+            pendientesYo={yoRellena ? pendientes : 0}
+            pendientesRival={rellenando && !yoRellena ? pendientes : 0}
+          />
+        }
+        yo={{
+          perfil: perfiles[uid],
+          mostrarVidas: false,
+          enTurno: esMiTurno,
+          color: miJugador.color,
+          extra: <ExtraElemental jugador={miJugador} />,
+        }}
+        rival={{
+          perfil: perfiles[rivalUid],
+          mostrarVidas: false,
+          enTurno: !esMiTurno,
+          color: rivalJugador.color,
+          extra: <ExtraElemental jugador={rivalJugador} />,
+        }}
+      />
+
+      <div className={"gp-status" + (esMiTurno ? " gp-status--activo" : "")}>
+        {rellenando
+          ? yoRellena
+            ? "El rival ya no puede moverse: te quedas con las casillas restantes"
+            : "Ya no puedes moverte: el rival se queda con las casillas restantes"
+          : esMiTurno
+          ? procesando
+            ? "Enviando jugada..."
+            : mensajeModo
+          : estoyCongelado
+          ? "Estás congelado: pierdes este turno"
+          : rivalCongelado
+          ? "El rival está congelado"
+          : "Turno del rival"}
       </div>
+      {error && <p className="gp-error">{error}</p>}
 
-      {esMiTurno ? (
-        <p className="turno-activo">
-          Tu turno{" "}
-          {procesando
-            ? "(enviando jugada...)"
-            : segundosRestantes !== null && `(${segundosRestantes}s)`}
-        </p>
-      ) : (
-        <p className="turno-espera">
-          {estoyCongelado ? "Congelado — " : ""}
-          Turno del rival {segundosRestantes !== null && `(${segundosRestantes}s)`}
-        </p>
-      )}
-
-      {esMiTurno && <p className="elemental-instruccion">{mensajeModo}</p>}
-      {error && <p className="error-text">{error}</p>}
-
-      <div className="elemental-inventarios">
-        <div className="elemental-inventario">
-          <p className="elemental-inventario-titulo">Tus bombas</p>
-          <div className="elemental-bombas">
-            {Object.entries(NOMBRES_BOMBA).map(([tipo, { nombre, icono }]) => {
-              const disponible = miJugador.bombas?.[tipo];
-              const armada = modo === tipo || (tipo === "lianas" && modo?.startsWith("lianas"));
-              return (
-                <button
-                  key={tipo}
-                  className={`elemental-bomba-btn ${!disponible ? "elemental-bomba-usada" : ""} ${armada ? "elemental-bomba-armada" : ""}`}
-                  disabled={!disponible || !esMiTurno || procesando || (modo !== null && !armada)}
-                  onClick={() => armarBomba(tipo)}
-                  title={disponible ? `Usar ${nombre}` : `${nombre} ya usada`}
-                >
-                  {icono} {nombre}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        <div className="elemental-inventario">
-          <p className="elemental-inventario-titulo">Bombas del rival</p>
-          <div className="elemental-bombas">
-            {Object.entries(NOMBRES_BOMBA).map(([tipo, { nombre, icono }]) => {
-              const disponible = rivalJugador.bombas?.[tipo];
-              return (
-                <span
-                  key={tipo}
-                  className={`elemental-bomba-rival ${!disponible ? "elemental-bomba-usada" : ""}`}
-                >
-                  {icono} {nombre}
-                </span>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-
-      {modo !== null && (
-        <div className="elemental-acciones-modo">
-          <button onClick={cancelarModo} disabled={procesando} className="elemental-cancelar">
+      <div className="gp-elemental-acciones">
+        {Object.entries(NOMBRES_BOMBA).map(([tipo, { nombre, imagen }]) => {
+          const disponible = miJugador.bombas?.[tipo];
+          const armada = modo === tipo || (tipo === "lianas" && modo?.startsWith("lianas"));
+          return (
+            <button
+              key={tipo}
+              type="button"
+              className={
+                "gp-bomba-btn" +
+                (!disponible ? " gp-bomba-btn--usada" : "") +
+                (armada ? " gp-bomba-btn--armada" : "")
+              }
+              disabled={!disponible || !esMiTurno || procesando || (modo !== null && !armada)}
+              onClick={() => armarBomba(tipo)}
+              title={disponible ? `Usar ${nombre}` : `${nombre} ya usada`}
+            >
+              <img src={imagen} alt="" draggable="false" />
+              <span>{nombre}</span>
+            </button>
+          );
+        })}
+        {modo !== null && (
+          <button type="button" onClick={cancelarModo} disabled={procesando} className="gp-cancelar">
             Cancelar
           </button>
-        </div>
-      )}
+        )}
+      </div>
 
       <TableroElemental
         partida={partida}
@@ -311,7 +361,9 @@ export default function FaseJuegoElemental({ partidaId, partida }) {
         onCasillaClick={handleCasillaClick}
         deshabilitado={!esMiTurno || procesando}
         casillaEnProceso={casillaEnProceso}
+        relleno={partida.relleno}
+        rellenoVisible={progreso}
       />
-    </div>
+    </>
   );
 }

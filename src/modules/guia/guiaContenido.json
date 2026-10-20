@@ -1,0 +1,177 @@
+[
+  {
+    "id": "objetivo",
+    "categoria": "basico",
+    "titulo": "Objetivo del juego",
+    "cuerpo": "Cada jugador coloca bombas en el tablero y después ambos se turnan para activar casillas. Si activas una casilla con bombas, pierdes vidas. Gana quien conserve sus vidas: la partida termina cuando un jugador pierde sus 3 vidas.",
+    "orden": 1
+  },
+  {
+    "id": "vidas",
+    "categoria": "basico",
+    "titulo": "Vidas",
+    "cuerpo": "Empiezas con 3 vidas. Una casilla con bombas te quita la suma del daño de todas las bombas que contiene. Si el daño te deja en 0 o menos, pierdes la partida al instante. Si llegan a la ronda 10, gana quien tenga más vidas.",
+    "orden": 2
+  },
+  {
+    "id": "preparacion",
+    "categoria": "basico",
+    "titulo": "Fase de preparación",
+    "cuerpo": "Antes de cada ronda tienes 30 segundos para colocar tus bombas en el tablero. Puedes poner varias bombas en la misma casilla y su daño se suma. Tu rival ve cada bomba que colocas solo durante 3 segundos; después queda oculta. Si el tiempo se agota, la ronda empieza con las bombas que alcanzaste a colocar. Si ninguno de los dos coloca bombas en la primera ronda, la partida se cancela por inactividad.",
+    "orden": 3
+  },
+  {
+    "id": "turnos",
+    "categoria": "basico",
+    "titulo": "Turnos y Papa Caliente",
+    "cuerpo": "Por turnos, cada jugador activa una casilla. El tiempo para elegir baja con las rondas: 7 s en la ronda 1, 6 s en la 2, 5 s en la 3 y 3 s desde la 4. Si se acaba el tiempo, pierdes 1 vida y termina la ronda.",
+    "orden": 4
+  },
+  {
+    "id": "seguras",
+    "categoria": "basico",
+    "titulo": "Casillas seguras",
+    "cuerpo": "Una casilla segura es la que no tiene ninguna bomba, ni tuya ni de tu rival. Cuando alguien la activa se bloquea para los dos jugadores durante el resto de la ronda. La ronda termina cuando se descubren todas las casillas seguras.",
+    "orden": 5
+  },
+  {
+    "id": "clases",
+    "categoria": "bombas",
+    "titulo": "Clases de bomba",
+    "cuerpo": "Antes de jugar en modo Estándar eliges una clase. Cada clase cambia cuántas bombas puedes colocar y cuánto daño hacen: la MiniBomba coloca muchas y quita 0.5 vidas, la Bomba es el equilibrio y quita 1 vida, y la Bombota coloca pocas pero quita 1.5 vidas. La opción Aleatoria asigna una al azar.",
+    "orden": 6
+  },
+  {
+    "id": "cantidad",
+    "categoria": "bombas",
+    "titulo": "Bombas por ronda",
+    "cuerpo": "Cantidad de bombas que colocas según la ronda. Ronda 1: MiniBomba 8, Bomba 5, Bombota 3. Ronda 2: 12, 8 y 5. Ronda 3: 16, 11 y 7. Ronda 4 o posterior: 18, 14 y 10. Cuando llegas al límite no puedes colocar más.",
+    "orden": 7
+  },
+  {
+    "id": "cuadrado",
+    "categoria": "tableros",
+    "titulo": "Tablero Cuadrado",
+    "cuerpo": "Ronda 1: 5x5. Ronda 2: 6x6. Ronda 3 en adelante: 7x7.",
+    "orden": 8
+  },
+  {
+    "id": "rectangulo",
+    "categoria": "tableros",
+    "titulo": "Tablero Rectángulo",
+    "cuerpo": "Ronda 1: 7x4. Ronda 2: 8x5. Ronda 3 en adelante: 9x6.",
+    "orden": 9
+  },
+  {
+    "id": "anillo",
+    "categoria": "tableros",
+    "titulo": "Tablero Anillo",
+    "cuerpo": "Tiene un hueco en el centro que no se puede jugar. Ronda 1: 6x6 con centro de 2x2. Ronda 2: 7x7 con centro de 3x3. Ronda 3 en adelante: 8x8 con centro de 4x4.",
+    "orden": 10
+  },
+  {
+    "id": "seleccion",
+    "categoria": "tableros",
+    "titulo": "Cómo se elige el tablero",
+    "cuerpo": "El tablero de cada partida se elige al azar entre los tres y lo genera el servidor, así que ambos jugadores ven exactamente lo mismo.",
+    "orden": 11
+  },
+  {
+    "id": "estandar",
+    "categoria": "modos",
+    "titulo": "Estándar",
+    "cuerpo": "El duelo clásico de bombas y vidas que describe la sección Cómo jugar. Es el único modo donde eliges la clase de bomba. Es la mejor forma de aprender las reglas.",
+    "orden": 12
+  },
+  {
+    "id": "venenosas",
+    "categoria": "modos",
+    "titulo": "Bombas Venenosas",
+    "cuerpo": "Cuando detonas una bomba te queda una carga de veneno que resta 0.25 vidas cada 10 segundos. Las cargas se acumulan y actúan por separado. Al terminar la ronda todas las cargas se eliminan y el tablero se reinicia.",
+    "orden": 13
+  },
+  {
+    "id": "elementales",
+    "categoria": "modos",
+    "titulo": "Bombas Elementales",
+    "cuerpo": "Aquí se conquista el tablero. Empiezas en una esquina y solo puedes marcar casillas junto a las que ya controlas. Cada ronda recibes una Bomba Eléctrica, una Bomba de Lianas y una Bomba de Hielo, pero solo puedes usar una por turno. Gana quien marque más casillas al terminar la partida. Si hay empate, ambos reciben 15 puntos de Elo.",
+    "orden": 14
+  },
+  {
+    "id": "aleatorios",
+    "categoria": "modos",
+    "titulo": "Parámetros al azar",
+    "cuerpo": "En Bombas Elementales el tablero, la clase de bomba y los efectos especiales se asignan al azar antes de la preparación, y ambos jugadores los reciben a la vez.",
+    "orden": 15
+  },
+  {
+    "id": "elo",
+    "categoria": "rangos",
+    "titulo": "Cómo funciona el Elo",
+    "cuerpo": "Ganar suma puntos de Elo y perder los resta. Cuánto cambia depende de la diferencia de Elo con tu rival: vencer a alguien más fuerte da más puntos. Tu Elo define tu rango y se lleva por separado en cada modalidad.",
+    "orden": 16
+  },
+  {
+    "id": "cadetes",
+    "categoria": "rangos",
+    "titulo": "Cadetes Bomberos",
+    "cuerpo": "De 0 a 299 puntos de Elo. Es el rango inicial.",
+    "orden": 17
+  },
+  {
+    "id": "entusiastas",
+    "categoria": "rangos",
+    "titulo": "Entusiastas de las Explosiones",
+    "cuerpo": "De 300 a 699 puntos de Elo.",
+    "orden": 18
+  },
+  {
+    "id": "genios",
+    "categoria": "rangos",
+    "titulo": "Genios Explosivos",
+    "cuerpo": "De 700 a 999 puntos de Elo.",
+    "orden": 19
+  },
+  {
+    "id": "senor",
+    "categoria": "rangos",
+    "titulo": "Señor de las Bombas",
+    "cuerpo": "1000 puntos de Elo o más. Es el rango más alto.",
+    "orden": 20
+  },
+  {
+    "id": "que",
+    "categoria": "tienda",
+    "titulo": "Qué puedes comprar",
+    "cuerpo": "La tienda vende marcos de avatar, banners de perfil y títulos con las coronas que ganas jugando. Son solo cosméticos: no dan ventaja en la partida.",
+    "orden": 21
+  },
+  {
+    "id": "rareza",
+    "categoria": "tienda",
+    "titulo": "Rareza",
+    "cuerpo": "Cada objeto es Común, Raro, Épico o Legendario, y la rareza se nota en el color de su tarjeta.",
+    "orden": 22
+  },
+  {
+    "id": "titulo",
+    "categoria": "tienda",
+    "titulo": "Títulos",
+    "cuerpo": "Tu título por defecto es tu rango actual y cambia cuando subes de rango. Los títulos que compres reemplazan al rango mientras los tengas equipados.",
+    "orden": 23
+  },
+  {
+    "id": "equipar",
+    "categoria": "tienda",
+    "titulo": "Equipar desde el inventario",
+    "cuerpo": "Todo lo que compras queda en tu inventario. Desde ahí equipas un marco, un banner y un título a la vez, y se muestran en tu perfil.",
+    "orden": 24
+  },
+  {
+    "id": "coronas",
+    "categoria": "coronas",
+    "titulo": "Coronas, misiones y logros",
+    "cuerpo": "Ganas coronas al ganar partidas, completando misiones diarias, logros y eventos especiales. Las coronas se gastan en la tienda. Los eventos tienen misiones de tiempo limitado con recompensas exclusivas.",
+    "orden": 25
+  }
+]

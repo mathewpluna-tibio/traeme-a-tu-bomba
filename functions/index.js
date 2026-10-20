@@ -238,6 +238,10 @@ const UMBRAL_SENOR = 1000;
 const UMBRAL_SENOR_SIN_LIMITE = 1150;
 
 const candidatosValidos = candidatos.filter((c) => {
+  // Invitados y usuarios registrados tienen colas separadas: un invitado
+  // solo juega contra invitados y un registrado solo contra registrados.
+  if ((jugador.esInvitado === true) !== (c.esInvitado === true)) return false;
+
   const tiempoEsperandoCandidato = ahora - c.timestamp;
   const tiempoMax = Math.max(tiempoEsperando, tiempoEsperandoCandidato);
 
@@ -776,6 +780,16 @@ function siguienteInicioColocacion(tipoFin, uidQueActivo, uidRival) {
   return uidRival;
 }
 
+// Duración (ms) del sonido de detonación de cada clase en el cliente
+// (src/assets/sonidos). En Estándar la ronda espera a que termine.
+const DURACION_SONIDO_DETONACION_MS = { minibomba: 2400, bomba: 2200, bombota: 3700 };
+
+function duracionSonidoDetonacion(bombas) {
+  return Math.max(2200, ...bombas.map((b) => DURACION_SONIDO_DETONACION_MS[b.tipo] || 2200));
+}
+
+const esperar = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
 // --- Helper: arma una nueva ronda (o resuelve fin de partida en ronda 10) ---
 async function iniciarNuevaRonda(partidaId, uidInicial) {
   const partidaSnap = await rtdb.ref(`partidas/${partidaId}`).once("value");
@@ -798,6 +812,7 @@ async function iniciarNuevaRonda(partidaId, uidInicial) {
     casillas: casillasNuevas,
     estado: "preparacion",
     turnoJuego: null,
+    detonacion: null,
     turnoColocacion: {
       uidActivo: uidInicial,
       inicioEn: Date.now(),
@@ -941,8 +956,18 @@ exports.activarCasilla = onCall(async (request) => {
     const vidasActuales = partida.jugadores[uid].vidas;
     const vidasNuevas = Math.max(0, vidasActuales - danoTotal);
 
-    await rtdb.ref(`partidas/${partidaId}/jugadores/${uid}/vidas`).set(vidasNuevas);
+    // RQF-TAB-03 / Estándar: la casilla queda detonada y el turno se congela
+    // (turnoJuego = null) mientras ambos clientes reproducen la animación y el
+    // sonido de la explosión. Solo al terminar el audio cambia la ronda.
+    const duracionDetonacion = duracionSonidoDetonacion(bombas);
+    await rtdb.ref(`partidas/${partidaId}`).update({
+      [`casillas/${casillaClave}/detonada`]: true,
+      [`jugadores/${uid}/vidas`]: vidasNuevas,
+      turnoJuego: null,
+      detonacion: { casilla: casillaClave, uid, en: Date.now(), duracionMs: duracionDetonacion },
+    });
     console.log(`[Juego] ${uid} detonó ${casillaClave}, daño=${danoTotal}, vidas restantes=${vidasNuevas}`);
+    await esperar(duracionDetonacion);
 
     if (vidasNuevas <= 0) {
       await finalizarPartidaPorDerrota(partidaId, uid, uidRival);
@@ -1052,9 +1077,22 @@ async function avanzarTurnoElemental(partidaId, uidPropuesto) {
   // el rival se queda con todas las casillas que alcanzaría y se acaba.
   const uidRelleno = detectarRellenoAutomatico(partida);
   if (uidRelleno) {
-    await rtdb.ref(`partidas/${partidaId}`).update(rellenarCasillasPara(uidRelleno, partida));
+    const actualizacionesRelleno = rellenarCasillasPara(uidRelleno, partida);
+    const clavesRelleno = Object.keys(actualizacionesRelleno)
+      .filter((k) => k.endsWith("/marcadaPor"))
+      .map((k) => k.split("/")[1]);
+    // Los clientes animan el relleno casilla por casilla; la partida sigue en
+    // curso (sin turno) hasta que termina y entonces se muestra el resultado.
+    const pasoMs = Math.max(40, Math.min(140, Math.floor(3200 / Math.max(1, clavesRelleno.length))));
+    const duracionMs = clavesRelleno.length * pasoMs + 1200;
+    await rtdb.ref(`partidas/${partidaId}`).update({
+      ...actualizacionesRelleno,
+      turnoActual: null,
+      relleno: { uid: uidRelleno, casillas: clavesRelleno, pasoMs, duracionMs, en: Date.now() },
+    });
+    console.log(`[Elementales] Relleno automático para ${uidRelleno} en partida ${partidaId} (${clavesRelleno.length} casillas).`);
+    await esperar(duracionMs);
     const partidaRellena = (await rtdb.ref(`partidas/${partidaId}`).once("value")).val();
-    console.log(`[Elementales] Relleno automático para ${uidRelleno} en partida ${partidaId}.`);
     await finalizarPartidaElemental(partidaId, partidaRellena);
     return;
   }
@@ -1194,6 +1232,9 @@ exports.usarBombaElemental = onCall(async (request) => {
     throw new HttpsError("invalid-argument", err.message);
   }
 
+  // Los clientes usan `ultimaBomba` para reproducir la animación y el sonido
+  // de la bomba en ambos tableros (RQF-TAB-03).
+  actualizaciones.ultimaBomba = { tipo: tipoBomba, uid, casilla: casillaObjetivo, en: Date.now() };
   await rtdb.ref(`partidas/${partidaId}`).update(actualizaciones);
   await registrarProgreso(uid, "bomba_elemental_usada", 1);
   if (tipoBomba === "hielo") {

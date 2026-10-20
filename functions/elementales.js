@@ -280,10 +280,12 @@ function detectarRellenoAutomatico(partida) {
  * adyacencia a través de casillas libres). */
 function rellenarCasillasPara(uid, partida) {
   const p = sinBloqueos(partida);
+  // Recorrido en anchura: el orden de `visitadas` es el orden en que se
+  // rellenan las casillas (así el cliente lo anima como una ola).
   const visitadas = new Set(casillasPropiasDisponibles(uid, p));
   const pendientes = [...visitadas];
   while (pendientes.length > 0) {
-    const actual = pendientes.pop();
+    const actual = pendientes.shift();
     for (const vecino of vecinosOrtogonales(actual)) {
       if (!visitadas.has(vecino) && casillaLibre(vecino, p)) {
         visitadas.add(vecino);

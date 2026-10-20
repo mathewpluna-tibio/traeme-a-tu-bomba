@@ -1,0 +1,43 @@
+.gu-page {
+  --gu-card: #1c1d27;
+  --gu-text: #f4f4f8;
+  --gu-muted: #9a9aab;
+  --gu-border: rgba(255, 255, 255, 0.08);
+  --gu-purple-1: #4b3cc9;
+  --gu-purple-2: #7d5be0;
+  color: var(--gu-text);
+  font-family: "Nunito", sans-serif;
+  text-align: left;
+}
+.gu-page *, .gu-page *::before, .gu-page *::after { box-sizing: border-box; }
+.gu-page h2, .gu-page p { margin: 0; }
+.gu-container { max-width: 760px; margin: 0 auto; padding: 8px 8px 48px; display: flex; flex-direction: column; gap: 18px; }
+.gu-back { align-self: flex-start; background: none; border: none; padding: 0; color: var(--gu-muted); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+.gu-back:hover { color: var(--gu-text); }
+.gu-title { font-family: "Baloo 2", sans-serif; font-size: 32px; font-weight: 800; color: var(--gu-text); margin: 6px 0 4px; }
+.gu-subtitle, .gu-muted { color: var(--gu-muted); font-size: 14px; }
+
+.gu-tabs { display: flex; gap: 8px; flex-wrap: wrap; }
+.gu-tab {
+  padding: 9px 16px; border-radius: 999px; border: 1px solid var(--gu-border);
+  background: var(--gu-card); color: var(--gu-muted);
+  font: inherit; font-weight: 700; font-size: 13px; cursor: pointer;
+}
+.gu-tab:hover { color: var(--gu-text); border-color: rgba(255, 255, 255, 0.2); }
+.gu-tab--active { background: linear-gradient(135deg, var(--gu-purple-1), var(--gu-purple-2)); color: #fff; border-color: transparent; }
+
+.gu-sections { display: flex; flex-direction: column; gap: 10px; }
+.gu-card { background: var(--gu-card); border: 1px solid var(--gu-border); border-radius: 16px; overflow: hidden; }
+.gu-card--open { border-color: rgba(125, 91, 224, 0.5); }
+.gu-card-header {
+  width: 100%; display: flex; align-items: center; gap: 12px; padding: 16px 18px;
+  background: transparent; border: none; color: var(--gu-text); font: inherit; cursor: pointer; text-align: left;
+}
+.gu-card-title { flex: 1; font-weight: 800; font-size: 15px; color: var(--gu-text); }
+.gu-card-arrow {
+  width: 8px; height: 8px; border-right: 2px solid var(--gu-muted); border-bottom: 2px solid var(--gu-muted);
+  transform: rotate(45deg); margin-bottom: 3px; flex-shrink: 0;
+}
+.gu-card--open .gu-card-arrow { transform: rotate(-135deg); margin-bottom: -3px; }
+.gu-card-body { padding: 0 18px 18px; display: flex; flex-direction: column; gap: 8px; }
+.gu-card-body p { font-size: 14px; line-height: 1.65; color: #c9c9d6; }

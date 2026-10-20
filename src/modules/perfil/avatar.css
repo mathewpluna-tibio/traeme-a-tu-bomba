@@ -53,20 +53,24 @@
   text-align: center;
   border-radius: 20px;
   padding: 36px 24px;
+  background-color: var(--pf-card-dark);
   background-size: cover;
   background-position: center;
+  background-repeat: no-repeat;
   overflow: hidden;
 }
 
 /* Oscurece un poco el banner para que el texto siempre se lea bien,
    sin importar qué tan clara sea la imagen de fondo */
-.pf-card-overlay {
+.pf-card > .pf-card-overlay {
   position: absolute;
   inset: 0;
+  z-index: 0;
+  pointer-events: none;
   background: linear-gradient(180deg, rgba(15, 16, 21, 0.35) 0%, rgba(15, 16, 21, 0.75) 100%);
 }
 
-.pf-card > * {
+.pf-card > *:not(.pf-card-overlay) {
   position: relative;
   z-index: 1;
 }

@@ -19,6 +19,7 @@ import LogrosPage from "../logros/LogrosPage";
 import InventarioPage from "../inventario/InventarioPage";
 import TiendaPage from "../tienda/TiendaPage";
 import EventoPage from "../eventos/EventoPage";
+import GuiaPage from "../guia/GuiaPage";
 import { useEventos } from "../../hooks/useEventos";
 import { formatoRestante } from "../eventos/eventosConfig";
 import AmigosPage from "../amigos/AmigosPage";
@@ -272,7 +273,12 @@ export default function MenuPrincipal() {
       <div className="gm-sidebar-footer">
         <div className="gm-footer-icons">
           <button className="gm-icon-btn" aria-label="Configuración">⚙️</button>
-          <button className="gm-icon-btn" aria-label="Ayuda">❓</button>
+          <button
+            className="gm-icon-btn"
+            aria-label="Guía del juego"
+            title="Guía del juego"
+            onClick={() => { setNavActivo(null); setPantallaActiva("guia"); }}
+          >❓</button>
         </div>
 
         <div
@@ -363,6 +369,12 @@ export default function MenuPrincipal() {
     {pantallaActiva === "evento" && (
       <div className="gm-content-full">
         <EventoPage onVolver={volverAJugar} />
+      </div>
+    )}
+
+    {pantallaActiva === "guia" && (
+      <div className="gm-content-full">
+        <GuiaPage onVolver={volverAJugar} />
       </div>
     )}
 

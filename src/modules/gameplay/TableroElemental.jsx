@@ -1,5 +1,13 @@
+import { useEffect, useMemo, useRef } from "react";
 import { calcularDimensionesElemental, casillaBloqueada } from "./elementalesUtils";
+import { IMAGEN_BOMBA } from "./bombasAssets";
+import { animarMarca } from "./efectos/animaciones";
 
+/**
+ * `relleno` (opcional): { casillas: [...] } en el orden en que se rellenan al
+ * terminar la partida. `rellenoVisible` es cuántas de esas casillas ya se
+ * muestran con su color; el resto aparece libre hasta que les toca.
+ */
 export default function TableroElemental({
   partida,
   colorPorUid,
@@ -8,10 +16,31 @@ export default function TableroElemental({
   onCasillaClick,
   deshabilitado,
   casillaEnProceso = null,
+  relleno = null,
+  rellenoVisible = 0,
 }) {
   const { filas, columnas } = calcularDimensionesElemental(partida);
   const resaltadas = new Set(casillasResaltadas);
   const seleccionadas = new Set(casillasSeleccionadas);
+  const contenedorRef = useRef(null);
+  const visiblesPrevias = useRef(rellenoVisible);
+
+  const ordenRelleno = useMemo(() => {
+    const m = new Map();
+    (relleno?.casillas || []).forEach((clave, i) => m.set(clave, i));
+    return m;
+  }, [relleno]);
+
+  // Cada casilla que se revela en el relleno hace un pequeño "pop".
+  useEffect(() => {
+    const desde = visiblesPrevias.current;
+    visiblesPrevias.current = rellenoVisible;
+    if (!relleno || rellenoVisible <= desde || !contenedorRef.current) return;
+    for (let i = desde; i < rellenoVisible; i++) {
+      const clave = relleno.casillas[i];
+      animarMarca(contenedorRef.current.querySelector(`[data-casilla="${clave}"]`));
+    }
+  }, [rellenoVisible, relleno]);
 
   const celdas = [];
   for (let f = 0; f < filas; f++) {
@@ -20,49 +49,49 @@ export default function TableroElemental({
       const casilla = partida.casillas[clave];
 
       if (!casilla) {
-        celdas.push(<div key={clave} className="casilla-elemental casilla-hueco" />);
+        celdas.push(<div key={clave} className="gp-cell gp-cell--hueco" />);
         continue;
       }
 
-      const color = casilla.marcadaPor ? colorPorUid[casilla.marcadaPor] : null;
+      const indiceRelleno = ordenRelleno.get(clave);
+      const pendienteDeRelleno = indiceRelleno !== undefined && indiceRelleno >= rellenoVisible;
+      const color = casilla.marcadaPor && !pendienteDeRelleno ? colorPorUid[casilla.marcadaPor] : null;
       const bloqueada = casillaBloqueada(clave, partida);
       const esResaltada = resaltadas.has(clave);
       const esSeleccionada = seleccionadas.has(clave);
-
-      const clases = ["casilla-elemental"];
-      if (color) clases.push(`casilla-elemental-${color}`);
-      if (bloqueada) clases.push("casilla-elemental-bloqueada");
-      if (esResaltada) clases.push("casilla-elemental-jugable");
-      if (esSeleccionada) clases.push("casilla-elemental-seleccionada");
       const enProceso = casillaEnProceso === clave;
-      if (enProceso) clases.push("casilla-elemental-procesando");
+
+      const clases = ["gp-cell", "gp-cell--elemental"];
+      if (color) clases.push(`gp-cell--${color}`);
+      if (indiceRelleno !== undefined && !pendienteDeRelleno) clases.push("gp-cell--relleno");
+      if (bloqueada) clases.push("gp-cell--lianas");
+      if (esResaltada) clases.push("gp-cell--jugable gp-cell--resaltada");
+      if (esSeleccionada) clases.push("gp-cell--seleccionada");
+      if (enProceso) clases.push("gp-cell--procesando");
 
       celdas.push(
         <button
           key={clave}
+          type="button"
           className={clases.join(" ")}
           data-casilla={clave}
           disabled={deshabilitado || (!esResaltada && !esSeleccionada && !enProceso)}
           onClick={() => onCasillaClick(clave)}
           title={bloqueada ? "Bloqueada por Lianas" : undefined}
         >
-          {enProceso && <span className="spinner-mini" />}
-          {bloqueada && <span className="icono-elemental">🌿</span>}
+          {bloqueada && <img className="gp-cell-lianas" src={IMAGEN_BOMBA.lianas} alt="" draggable="false" />}
+          {enProceso && <span className="gp-spinner" />}
         </button>
       );
     }
   }
 
   return (
-    <div
-      className="tablero-elemental-grid"
-      style={{
-        display: "grid",
-        gridTemplateColumns: `repeat(${columnas}, 1fr)`,
-        gap: "3px",
-      }}
-    >
-      {celdas}
+    <div className="gp-board gp-board--elemental" ref={contenedorRef}>
+      <div className="gp-board-grid" style={{ "--cols": columnas, "--rows": filas }}>
+        {celdas}
+      </div>
+      <div className="gp-fx" aria-hidden="true" />
     </div>
   );
 }

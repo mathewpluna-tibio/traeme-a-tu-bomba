@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { collection, doc, getDoc, getDocs, limit, orderBy, query, where } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, limit, orderBy, query, startAfter, where } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import { db, functions } from "../../firebase/config";
 
@@ -86,60 +86,88 @@ function Fila({ jugador, onCambio }) {
   );
 }
 
+const POR_PAGINA = 25;
+const FIN_RANGO = "\uf8ff";
+
 export default function AdminJugadores() {
   const [termino, setTermino] = useState("");
-  const [resultados, setResultados] = useState([]);
-  const [buscando, setBuscando] = useState(false);
+  const [lista, setLista] = useState([]);
+  const [cursor, setCursor] = useState(null);
+  const [hayMas, setHayMas] = useState(false);
+  const [cargando, setCargando] = useState(false);
 
+  const t = termino.trim();
+  const filtrando = t.length >= 2;
+
+  // Sin búsqueda: todos los jugadores (paginados). Con búsqueda (2+ letras): filtrados.
   useEffect(() => {
-    const t = termino.trim();
-    if (t.length < 2) {
-      setResultados([]);
-      return;
-    }
     let cancelado = false;
     const id = setTimeout(async () => {
-      setBuscando(true);
+      setCargando(true);
       try {
-        const porNombre = await getDocs(
-          query(collection(db, "usuarios"), orderBy("username"), where("username", ">=", t), where("username", "<=", t + ""), limit(20))
-        );
-        let lista = porNombre.docs.map((d) => ({ id: d.id, ...d.data() }));
-        if (t.length >= 20) {
+        const base = [collection(db, "usuarios"), orderBy("username")];
+        if (filtrando) base.push(where("username", ">=", t), where("username", "<=", t + FIN_RANGO));
+        const snap = await getDocs(query(...base, limit(filtrando ? 20 : POR_PAGINA)));
+        let datos = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        if (filtrando && t.length >= 20) {
           const porId = await getDoc(doc(db, "usuarios", t));
-          if (porId.exists() && !lista.some((j) => j.id === porId.id)) lista = [{ id: porId.id, ...porId.data() }, ...lista];
+          if (porId.exists() && !datos.some((j) => j.id === porId.id)) datos = [{ id: porId.id, ...porId.data() }, ...datos];
         }
-        if (!cancelado) setResultados(lista);
+        if (cancelado) return;
+        setLista(datos);
+        setCursor(snap.docs[snap.docs.length - 1] || null);
+        setHayMas(!filtrando && snap.docs.length === POR_PAGINA);
       } catch (err) {
-        console.error("Error al buscar jugadores:", err);
+        console.error("Error al cargar jugadores:", err);
       } finally {
-        if (!cancelado) setBuscando(false);
+        if (!cancelado) setCargando(false);
       }
-    }, 300);
+    }, filtrando || t === "" ? 300 : 0);
     return () => {
       cancelado = true;
       clearTimeout(id);
     };
-  }, [termino]);
+  }, [t, filtrando]);
 
-  const actualizar = (j) => setResultados((lista) => lista.map((x) => (x.id === j.id ? j : x)));
+  const cargarMas = async () => {
+    if (!cursor) return;
+    setCargando(true);
+    try {
+      const snap = await getDocs(query(collection(db, "usuarios"), orderBy("username"), startAfter(cursor), limit(POR_PAGINA)));
+      setLista((l) => [...l, ...snap.docs.map((d) => ({ id: d.id, ...d.data() }))]);
+      setCursor(snap.docs[snap.docs.length - 1] || cursor);
+      setHayMas(snap.docs.length === POR_PAGINA);
+    } catch (err) {
+      console.error("Error al cargar más jugadores:", err);
+    } finally {
+      setCargando(false);
+    }
+  };
+
+  const actualizar = (j) => setLista((l) => l.map((x) => (x.id === j.id ? j : x)));
 
   return (
     <section>
       <h2 className="ad-h2">Jugadores</h2>
       <input
         className="ad-input ad-search"
-        placeholder="Buscar por nombre de usuario o por ID"
+        placeholder="Filtrar por nombre de usuario o por ID"
         value={termino}
         onChange={(e) => setTermino(e.target.value)}
       />
-      {buscando && <p className="ad-muted">Buscando...</p>}
-      {!buscando && termino.trim().length >= 2 && resultados.length === 0 && <p className="ad-muted">Sin resultados.</p>}
+      {t.length === 1 && <p className="ad-muted">Escribe al menos 2 letras para filtrar.</p>}
+      {cargando && lista.length === 0 && <p className="ad-muted">Cargando...</p>}
+      {!cargando && lista.length === 0 && <p className="ad-muted">{filtrando ? "Sin resultados." : "Aún no hay jugadores."}</p>}
       <div className="ad-list">
-        {resultados.map((j) => (
+        {lista.map((j) => (
           <Fila key={j.id} jugador={j} onCambio={actualizar} />
         ))}
       </div>
+      {hayMas && (
+        <button type="button" className="ad-btn ad-btn--ghost" disabled={cargando} onClick={cargarMas}>
+          {cargando ? "Cargando..." : "Cargar más"}
+        </button>
+      )}
     </section>
   );
 }
