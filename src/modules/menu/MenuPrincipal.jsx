@@ -26,7 +26,9 @@ import AmigosPage from "../amigos/AmigosPage";
 import LobbyEspera from "../lobby/LobbyEspera";
 import LobbyEntrante from "../lobby/LobbyEntrante";
 import InvitacionesRetos from "../lobby/InvitacionesRetos";
+import ConfiguracionPage from "../configuracion/ConfiguracionPage";
 import { useSolicitudesPendientes } from "../../hooks/useAmigos";
+import { usePreferencias } from "../../hooks/usePreferencias";
 import logo from "../../assets/Logo_TATomba.png";
 import UserBomb from "../../assets/UserBomb.png"
 import "./MenuPrincipal.css";
@@ -64,6 +66,8 @@ export default function MenuPrincipal() {
     setLobbyEntrante(null);
     window.history.replaceState({}, "", window.location.pathname);
   };
+
+  usePreferencias();
 
   useEffect(() => {
     if (partidaId) {
@@ -272,7 +276,13 @@ export default function MenuPrincipal() {
 
       <div className="gm-sidebar-footer">
         <div className="gm-footer-icons">
-          <button className="gm-icon-btn" aria-label="Configuración">⚙️</button>
+          <button 
+            className="gm-icon-btn" 
+            aria-label="Configuración" 
+            title="Configuracion del juego"
+            onClick={()=> { setNavActivo(null); setPantallaActiva("configuracion");}}
+          >⚙️</button>
+
           <button
             className="gm-icon-btn"
             aria-label="Guía del juego"
@@ -375,6 +385,12 @@ export default function MenuPrincipal() {
     {pantallaActiva === "guia" && (
       <div className="gm-content-full">
         <GuiaPage onVolver={volverAJugar} />
+      </div>
+    )}
+
+    {pantallaActiva === "configuracion" && (
+      <div className="gm-content-full">
+        <ConfiguracionPage onVolver={volverAJugar} />
       </div>
     )}
 
