@@ -1,4 +1,115 @@
 {
-  "indexes": [],
+  "indexes": [
+    {
+      "collectionGroup": "usuarios",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "estadisticas.estandar.elo",
+          "order": "DESCENDING"
+        },
+        {
+          "fieldPath": "estadisticas.estandar.victorias",
+          "order": "DESCENDING"
+        },
+        {
+          "fieldPath": "estadisticas.estandar.derrotas",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "usuarios",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "estadisticas.estandar.victorias",
+          "order": "DESCENDING"
+        },
+        {
+          "fieldPath": "estadisticas.estandar.derrotas",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "usuarios",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "estadisticas.venenosas.elo",
+          "order": "DESCENDING"
+        },
+        {
+          "fieldPath": "estadisticas.venenosas.victorias",
+          "order": "DESCENDING"
+        },
+        {
+          "fieldPath": "estadisticas.venenosas.derrotas",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "usuarios",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "estadisticas.venenosas.victorias",
+          "order": "DESCENDING"
+        },
+        {
+          "fieldPath": "estadisticas.venenosas.derrotas",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "usuarios",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "estadisticas.elementales.elo",
+          "order": "DESCENDING"
+        },
+        {
+          "fieldPath": "estadisticas.elementales.victorias",
+          "order": "DESCENDING"
+        },
+        {
+          "fieldPath": "estadisticas.elementales.derrotas",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "usuarios",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "estadisticas.elementales.victorias",
+          "order": "DESCENDING"
+        },
+        {
+          "fieldPath": "estadisticas.elementales.derrotas",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "usuarios",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "estadisticas.elementales.casillasMarcadas",
+          "order": "DESCENDING"
+        },
+        {
+          "fieldPath": "estadisticas.elementales.victorias",
+          "order": "DESCENDING"
+        }
+      ]
+    }
+  ],
   "fieldOverrides": []
 }

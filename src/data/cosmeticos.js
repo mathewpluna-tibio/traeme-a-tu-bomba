@@ -1,31 +1,3 @@
-/**
- * Catálogo de cosméticos (marcos y banners de perfil).
- *
- * Esto es la base que usan tanto la Tienda como el Inventario (mismos ids,
- * mismas imágenes).
- *
- * `rareza` (comun | raro | epico | legendario) solo cambia el color/etiqueta
- * de la tarjeta en Tienda e Inventario.
- *
- * `precio` es en coronas y es solo para MOSTRAR el precio en la Tienda —
- * la Cloud Function `comprarCosmetico` (functions/tienda.js) nunca confía
- * en este archivo ni en nada que mande el cliente, tiene su propia copia
- * de precios como fuente de verdad. Si cambias un precio aquí, cámbialo
- * también allá.
- *
- * `precio: null` quiere decir que NO se vende en la Tienda:
- * - "Default" ya lo tiene todo mundo desde que se crea el perfil.
- * - "007" es exclusivo del logro "Maestro del Territorio" (gana 30
- *   partidas de Bombas Elementales).
- *
- * `holeRatio` es qué tan ancho es el hueco transparente del aro respecto
- * al lienzo cuadrado ya recortado de cada imagen (medido directamente
- * sobre cada PNG). Cada diseño tiene un borde de grosor distinto (el de
- * "007" o "Dino" es mucho más grueso que el de "Default"), así que la
- * foto de perfil no puede tener un tamaño fijo: se calcula a partir de
- * este valor para que SIEMPRE quede dentro del aro, sin importar cuál
- * esté equipado.
- */
 
 import marcoDefault from "../assets/cosmeticos/marcos/Default.png";
 import marcoMetal from "../assets/cosmeticos/marcos/Metal.png";
@@ -33,6 +5,9 @@ import marcoNat from "../assets/cosmeticos/marcos/Nat.png";
 import marcoElectro from "../assets/cosmeticos/marcos/Electro.png";
 import marco007 from "../assets/cosmeticos/marcos/007.png";
 import marcoDino from "../assets/cosmeticos/marcos/Dino.png";
+import marcoRangoEntusiastas from "../assets/cosmeticos/marcos/RangoEntusiastas.png";
+import marcoRangoGenios from "../assets/cosmeticos/marcos/RangoGenios.png";
+import marcoRangoSenor from "../assets/cosmeticos/marcos/RangoSenor.png";
 
 import bannerDefault from "../assets/cosmeticos/banners/Default.jpg";
 import bannerMetal from "../assets/cosmeticos/banners/Metal.jpg";
@@ -65,21 +40,33 @@ export function obtenerMarco(id) {
   return MARCOS[id] || MARCOS.Default;
 }
 
+export const MARCOS_RANGO = {
+  "Cadetes Bomberos": { id: "rango_cadetes", nombre: "Marco de Cadete", imagen: marcoDefault, holeRatio: 0.747 },
+  "Entusiastas de las Explosiones": { id: "rango_entusiastas", nombre: "Marco de Entusiasta", imagen: marcoRangoEntusiastas, holeRatio: 0.63 },
+  "Genios Explosivos": { id: "rango_genios", nombre: "Marco de Genio", imagen: marcoRangoGenios, holeRatio: 0.59 },
+  "Señor de las Bombas": { id: "rango_senor", nombre: "Marco de Señor", imagen: marcoRangoSenor, holeRatio: 0.52 },
+};
+
+/** Marco que corresponde al rango actual del jugador. */
+export function marcoDeRango(profile) {
+  const rango = profile?.estadisticas?.estandar?.rango || "Cadetes Bomberos";
+  return MARCOS_RANGO[rango] || MARCOS_RANGO["Cadetes Bomberos"];
+}
+
+/**
+ * Marco que se dibuja en el perfil y en la partida: el comprado que tenga
+ * equipado o, si tiene el base (o un id antiguo), el de su rango.
+ */
+export function marcoDelPerfil(profile) {
+  const id = profile?.marcoActivo;
+  if (id && MARCOS[id] && id !== "Default") return MARCOS[id];
+  return marcoDeRango(profile);
+}
+
 export function obtenerBanner(id) {
   return BANNERS[id] || BANNERS.Default;
 }
 
-/**
- * Títulos de la Tienda. El id ES el texto del título (así se guarda en
- * `titulosObtenidos` / `tituloActivo`). Los agrupa el tema del cosmético
- * al que pertenecen (007, Dino, Electro, Metal, Naturaleza).
- *
- * El título por defecto de todo jugador NO está aquí: es su rango actual
- * (`estadisticas.estandar.rango`) y cambia solo cuando sube de rango —
- * se guarda `tituloActivo: ""` y la UI muestra el rango del momento.
- *
- * Precios: fuente de verdad en functions/tienda.js (mantener sincronizado).
- */
 export const TITULOS = [
   { id: "Agente Doble", tema: "007", rareza: "legendario", precio: 100 },
   { id: "Licencia para Ganar", tema: "007", rareza: "legendario", precio: 100 },

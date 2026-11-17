@@ -1,5 +1,6 @@
 import UserBomb from "../../assets/UserBomb.png";
-import { obtenerBanner, obtenerMarco, tituloVisible } from "../../data/cosmeticos";
+import { marcoDelPerfil, obtenerBanner, tituloVisible } from "../../data/cosmeticos";
+import MarcoPerfil from "../perfil/MarcoPerfil";
 
 const TAM_MARCO = 54;
 
@@ -20,7 +21,7 @@ function Corazones({ vidas = 0 }) {
 
 function PanelJugador({ etiqueta, jugador, alinear = "izq" }) {
   const { perfil, vidas, mostrarVidas = true, extra, enTurno, color } = jugador;
-  const marco = obtenerMarco(perfil?.marcoActivo);
+  const marco = marcoDelPerfil(perfil);
   const banner = obtenerBanner(perfil?.bannerActivo);
   const tamFoto = Math.round(TAM_MARCO * (marco.holeRatio || 0.75) * 1.18);
   const nombre = perfil?.username || "Invitado";
@@ -42,7 +43,7 @@ function PanelJugador({ etiqueta, jugador, alinear = "izq" }) {
       <div className="gp-identity">
         <div className="gp-avatar" style={{ width: TAM_MARCO, height: TAM_MARCO }}>
           <img className="gp-avatar-foto" src={perfil?.fotoPerfil || UserBomb} alt="" style={{ width: tamFoto, height: tamFoto }} />
-          <img className="gp-avatar-marco" src={marco.imagen} alt="" aria-hidden="true" />
+          <MarcoPerfil className="gp-avatar-marco" marco={marco} />
         </div>
         <div className="gp-identity-text">
           <span className="gp-player-label">{etiqueta}</span>

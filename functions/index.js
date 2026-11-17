@@ -31,17 +31,8 @@ const {
   ALTO_TABLERO: ALTO_TABLERO_ELEMENTAL,
 } = require("./elementales");
 
-// Timer de turno fijo confirmado para Bombas Elementales (una sola ronda,
-// no hay progresión de rondas como en Estándar/Venenosas).
 const DURACION_TURNO_ELEMENTAL_MS = 7000;
 
-// "Seguro" de Elementales: una jugada que el jugador hizo a tiempo cuenta
-// aunque el servidor tarde en recibirla (latencia, arranque en frío de la
-// función). Dos mitades:
-// 1) El turno solo se da por perdido pasados GRACIA ms desde finalizaEn.
-// 2) Las jugadas llevan la hora (corregida con el reloj del servidor) a la
-//    que el jugador hizo clic: si fue antes de finalizaEn, es válida aunque
-//    llegue después.
 const GRACIA_TURNO_ELEMENTAL_MS = 2500;
 
 function validarAccionEnTiempoElemental(partida, { numeroTurno, enviadoEn }) {
@@ -148,6 +139,7 @@ exports.validarUsername = onCall(async (request) => {
 
 exports.limpiarInvitadosViejos = require("./mantenimiento").limpiarInvitadosViejos;
 exports.comprarCosmetico = require("./tienda").comprarCosmetico;
+exports.obtenerCatalogoTienda = require("./tienda").obtenerCatalogoTienda;
 exports.enviarSolicitudAmistad = require("./social").enviarSolicitudAmistad;
 exports.responderSolicitudAmistad = require("./social").responderSolicitudAmistad;
 exports.eliminarAmigo = require("./social").eliminarAmigo;
@@ -155,6 +147,7 @@ exports.crearLobby = require("./lobby").crearLobby;
 exports.cancelarLobby = require("./lobby").cancelarLobby;
 exports.rechazarReto = require("./lobby").rechazarReto;
 exports.unirseALobby = require("./lobby").unirseALobby;
+exports.expirarReto = require("./lobby").expirarReto;
 exports.guardarEvento = require("./admin").guardarEvento;
 exports.eliminarEvento = require("./admin").eliminarEvento;
 exports.banearUsuario = require("./admin").banearUsuario;
@@ -1060,14 +1053,8 @@ exports.verificarTimeoutJuego = onCall(async (request) => {
 });
 
 exports.rotarMisionesDiarias = require("./misiones").rotarMisionesDiarias;
+exports.asignarMisionesNuevoUsuario = require("./misiones").asignarMisionesNuevoUsuario;
 
-// ============================================================
-// BOMBAS ELEMENTALES (Modo Extra: juego de territorio, sin vidas)
-// ============================================================
-
-/** Avanza el turno tras una jugada válida en Elementales: revisa si la
- * partida terminó, salta el turno de cualquier jugador congelado, y arma
- * el siguiente `turnoActual` con el timer fijo de 7s. */
 async function avanzarTurnoElemental(partidaId, uidPropuesto) {
   const partidaSnap = await rtdb.ref(`partidas/${partidaId}`).once("value");
   const partida = partidaSnap.val();

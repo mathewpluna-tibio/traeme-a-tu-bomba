@@ -1,22 +1,6 @@
 const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 
-/**
- * Catálogo de precios de la Tienda. Esta es la fuente de verdad: el precio
- * que paga cada jugador SIEMPRE se calcula aquí, nunca con lo que mande el
- * cliente, precisamente porque las reglas de Firestore dejan que cualquier
- * cliente autenticado escriba su propio documento — si confiáramos en un
- * precio enviado desde el navegador, bastaría con editar la petición para
- * "comprar" cualquier cosmético por 0 coronas.
- *
- * "Default" no aparece aquí porque ya lo tiene todo mundo desde que se crea
- * el perfil (ver perfilInicial.js). "007" tampoco aparece: es exclusivo del
- * logro "Maestro del Territorio", no se vende.
- *
- * Mantener estos ids/precios sincronizados con el espejo de frontend en
- * src/data/cosmeticos.js (el mismo patrón que ya existe entre
- * misionesCatalogo.js y logrosCatalogo.js).
- */
 const CATALOGO_TIENDA = [
   // Marcos
   { tipo: "marco", id: "Metal", precio: 75 },
@@ -98,4 +82,14 @@ const comprarCosmetico = onCall(async (request) => {
   return { exito: true };
 });
 
-module.exports = { comprarCosmetico, CATALOGO_TIENDA };
+// RQNF-PERS-04 / RQNF-TIE-01: la Tienda pide el catálogo y sus precios al
+// servidor cada vez que se abre, así siempre muestra los precios vigentes
+// (los mismos con los que cobra comprarCosmetico).
+const obtenerCatalogoTienda = onCall(async (request) => {
+  if (!request.auth?.uid) {
+    throw new HttpsError("unauthenticated", "Debes iniciar sesión.");
+  }
+  return { catalogo: CATALOGO_TIENDA };
+});
+
+module.exports = { comprarCosmetico, obtenerCatalogoTienda, CATALOGO_TIENDA };

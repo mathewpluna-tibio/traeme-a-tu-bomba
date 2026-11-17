@@ -10,6 +10,14 @@ const rechazarRetoCallable = httpsCallable(functions, "rechazarReto");
 
 function Reto({ lobbyId, reto, onAceptar }) {
   const [estado, setEstado] = useState(null);
+  const [ahora, setAhora] = useState(() => Date.now());
+
+  // RQF-AMI-02B: cuenta regresiva hasta que el reto expire.
+  useEffect(() => {
+    if (!reto.expiraEn) return;
+    const id = setInterval(() => setAhora(Date.now()), 500);
+    return () => clearInterval(id);
+  }, [reto.expiraEn]);
 
   // El reto deja de mostrarse en cuanto el lobby ya no está esperando
   // (el retador canceló, se desconectó o la partida ya inició).
@@ -17,14 +25,16 @@ function Reto({ lobbyId, reto, onAceptar }) {
     return onValue(ref(rtdb, `lobbies/${lobbyId}/estado`), (snap) => setEstado(snap.val()));
   }, [lobbyId]);
 
-  if (estado !== "esperando") return null;
+  const segundos = reto.expiraEn ? Math.max(0, Math.ceil((reto.expiraEn - ahora) / 1000)) : null;
+  if (estado !== "esperando" || segundos === 0) return null;
 
   return (
     <div className="reto-toast">
       <p>
-        ⚔️ <strong>{reto.deUsername}</strong> te reta a{" "}
+        <strong>{reto.deUsername}</strong> te reta a{" "}
         <strong>{NOMBRE_MODALIDAD[reto.modalidad]}</strong>
       </p>
+      {segundos != null && <p className="reto-cuenta">Expira en {segundos} s</p>}
       <div>
         <button className="lobby-btn lobby-btn--primary" onClick={() => onAceptar(lobbyId)}>
           Aceptar

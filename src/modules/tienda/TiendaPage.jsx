@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { doc, updateDoc } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import { db, functions } from "../../firebase/config";
@@ -9,6 +9,7 @@ import UserBomb from "../../assets/UserBomb.png";
 import Store from "./Store";
 
 const comprarCosmeticoCallable = httpsCallable(functions, "comprarCosmetico");
+const obtenerCatalogoCallable = httpsCallable(functions, "obtenerCatalogoTienda");
 
 const CATEGORIAS = [
   { id: "marco", label: "Marcos" },
@@ -16,35 +17,68 @@ const CATEGORIAS = [
   { id: "titulo", label: "Títulos" },
 ];
 
-// Solo los que tienen precio se venden en la Tienda ("Default" ya lo
-// tiene todo mundo, "007" es exclusivo de Logros — ver cosmeticos.js).
-const enVenta = (catalogo, categoria) =>
-  Object.values(catalogo)
-    .filter((c) => c.precio != null)
-    .map((c) => ({
-      id: c.id,
-      category: categoria,
-      name: c.nombre,
-      rarity: c.rareza || "comun",
-      image: c.imagen,
-      holeRatio: c.holeRatio,
-      price: c.precio,
-    }));
+const ESTILO_ESTADO = { padding: 32, textAlign: "center", color: "#9a9aab", fontWeight: 700 };
 
-const MARCOS_VENTA = enVenta(MARCOS, "marco");
-const BANNERS_VENTA = enVenta(BANNERS, "banner");
-const TITULOS_VENTA = TITULOS.map((t) => ({
-  id: t.id, category: "titulo", name: t.id, rarity: t.rareza, price: t.precio,
-}));
+function aItemDeTienda({ tipo, id, precio }) {
+  if (tipo === "marco" || tipo === "banner") {
+    const c = (tipo === "marco" ? MARCOS : BANNERS)[id];
+    if (!c) return null;
+    return { id, category: tipo, name: c.nombre, rarity: c.rareza || "comun", image: c.imagen, holeRatio: c.holeRatio, price: precio };
+  }
+  if (tipo === "titulo") {
+    const t = TITULOS.find((x) => x.id === id);
+    return { id, category: "titulo", name: id, rarity: t?.rareza || "comun", price: precio };
+  }
+  return null;
+}
 
 export default function TiendaPage({ onVolver }) {
   const { user } = useAuth();
   const { profile, loading } = useUserProfile();
   const [busyId, setBusyId] = useState(null);
   const [error, setError] = useState("");
+  const [catalogo, setCatalogo] = useState(null); // null = cargando
+  const [errorCatalogo, setErrorCatalogo] = useState("");
+
+  const pedirCatalogo = useCallback(
+    () =>
+      obtenerCatalogoCallable()
+        .then((res) => {
+          setCatalogo((res.data?.catalogo || []).map(aItemDeTienda).filter(Boolean));
+          setErrorCatalogo("");
+        })
+        .catch((err) => {
+          console.error("Error al cargar el catálogo de la tienda:", err);
+          setErrorCatalogo("No se pudo cargar la tienda. Revisa tu conexión.");
+        }),
+    []
+  );
+
+  // Se pide cada vez que se abre la tienda.
+  useEffect(() => {
+    pedirCatalogo();
+  }, [pedirCatalogo]);
+
+  const reintentar = () => {
+    setErrorCatalogo("");
+    setCatalogo(null);
+    pedirCatalogo();
+  };
 
   if (loading) return <p>Cargando...</p>;
   if (!profile) return <p>No se encontró tu perfil.</p>;
+  if (errorCatalogo) {
+    return (
+      <div style={ESTILO_ESTADO}>
+        <p>{errorCatalogo}</p>
+        <div style={{ display: "flex", gap: 8, justifyContent: "center" }}>
+          <button type="button" onClick={reintentar}>Reintentar</button>
+          <button type="button" onClick={onVolver}>Volver</button>
+        </div>
+      </div>
+    );
+  }
+  if (!catalogo) return <p style={ESTILO_ESTADO}>Cargando tienda...</p>;
 
   const marcosPropios = new Set(profile.marcosComprados || []);
   const bannersPropios = new Set(profile.bannersComprados || []);
@@ -52,11 +86,13 @@ export default function TiendaPage({ onVolver }) {
   const marcoActivoId = obtenerMarco(profile.marcoActivo).id;
   const bannerActivoId = obtenerBanner(profile.bannerActivo).id;
 
-  const items = [
-    ...MARCOS_VENTA.map((i) => ({ ...i, owned: marcosPropios.has(i.id), equipped: marcoActivoId === i.id })),
-    ...BANNERS_VENTA.map((i) => ({ ...i, owned: bannersPropios.has(i.id), equipped: bannerActivoId === i.id })),
-    ...TITULOS_VENTA.map((i) => ({ ...i, owned: titulosPropios.has(i.id), equipped: (profile.tituloActivo || "") === i.id })),
-  ];
+  const propios = { marco: marcosPropios, banner: bannersPropios, titulo: titulosPropios };
+  const activo = { marco: marcoActivoId, banner: bannerActivoId, titulo: profile.tituloActivo || "" };
+  const items = catalogo.map((i) => ({
+    ...i,
+    owned: propios[i.category].has(i.id),
+    equipped: activo[i.category] === i.id,
+  }));
 
   const comprar = async (item) => {
     if (busyId) return;

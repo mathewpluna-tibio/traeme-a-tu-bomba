@@ -1,6 +1,7 @@
 import "./avatar.css";
 import UserBomb from "../../assets/UserBomb.png";
-import { obtenerMarco, obtenerBanner, tituloVisible } from "../../data/cosmeticos";
+import { marcoDelPerfil, obtenerBanner, tituloVisible } from "../../data/cosmeticos";
+import MarcoPerfil from "./MarcoPerfil";
 
 const FRAME_SIZE = 140; 
 const FACTOR_RELLENO = 1.18;
@@ -15,12 +16,10 @@ export default function ProfileHeader({
   onAddFriend = (id) => console.log("Enviar solicitud de amistad a:", id),
   onChallenge = (id) => console.log("Retar a partida privada a:", id),
 }) {
-  const marco = obtenerMarco(profile.marcoActivo);
+  // RQF-PER-01: el marco comprado equipado o, si no hay, el de su rango
+  const marco = marcoDelPerfil(profile);
   const banner = obtenerBanner(profile.bannerActivo);
 
-  // Cada aro tiene un grosor de borde distinto (007/Dino son mucho más
-  // gruesos que Default/Metal), así que el tamaño de la foto se calcula
-  // a partir del hueco real de CADA marco en vez de usar un valor fijo.
   const avatarSize = Math.round(FRAME_SIZE * marco.holeRatio * FACTOR_RELLENO);
 
   return (
@@ -34,7 +33,7 @@ export default function ProfileHeader({
           className="pf-avatar"
           style={{ width: avatarSize, height: avatarSize }}
         />
-        <img className="pf-marco" src={marco.imagen} alt="" aria-hidden="true" />
+        <MarcoPerfil className="pf-marco" marco={marco} />
         {!isOwnProfile && isOnline && <span className="pf-online-dot" />}
       </div>
 

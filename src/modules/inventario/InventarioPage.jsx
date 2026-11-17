@@ -3,12 +3,10 @@ import { doc, updateDoc } from "firebase/firestore";
 import { db } from "../../firebase/config";
 import { useAuth } from "../../context/AuthContext";
 import { useUserProfile } from "../../hooks/useUserProfile";
-import { obtenerMarco, obtenerBanner, TITULOS, tituloVisible } from "../../data/cosmeticos";
+import { marcoDeRango, obtenerMarco, obtenerBanner, TITULOS, tituloVisible } from "../../data/cosmeticos";
 import UserBomb from "../../assets/UserBomb.png";
 import Inventory, { NINGUNO } from "./Inventory";
 
-// "Default" lo tiene todo mundo. Los marcos/banners comprados o ganados
-// (p. ej. "007" por logro) vienen en marcosComprados / bannersComprados.
 const ID_BASE = "Default";
 
 export default function InventarioPage({ onVolver, onIrATienda }) {
@@ -26,9 +24,11 @@ export default function InventarioPage({ onVolver, onIrATienda }) {
   const bannerActivoId = obtenerBanner(profile.bannerActivo).id;
   const tituloActivo = profile.tituloActivo || "";
 
+  // El marco base se muestra como el marco del rango actual (RQF-PER-01).
+  const deRango = marcoDeRango(profile);
   const marcos = [ID_BASE, ...new Set(profile.marcosComprados || [])].map((id) => {
-    const m = obtenerMarco(id);
-    return { id: m.id, category: "marco", name: m.nombre, rarity: m.rareza || "comun", image: m.imagen, holeRatio: m.holeRatio, equipped: marcoActivoId === m.id };
+    const m = id === ID_BASE ? { ...deRango, id: ID_BASE, rareza: "comun" } : obtenerMarco(id);
+    return { id: m.id, category: "marco", name: m.nombre, tag: id === ID_BASE ? "Rango" : undefined, rarity: m.rareza || "comun", image: m.imagen, holeRatio: m.holeRatio, equipped: marcoActivoId === m.id };
   });
   const banners = [ID_BASE, ...new Set(profile.bannersComprados || [])].map((id) => {
     const b = obtenerBanner(id);

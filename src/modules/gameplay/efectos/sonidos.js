@@ -117,6 +117,42 @@ export function reproducirSonido(tipo, volumen = 0.9) {
   fuente.start(inicio, 0, duracion);
 }
 
+// Alertas cortas generadas con osciladores (no necesitan archivo de audio).
+// "rival": rival encontrado (RQF-MEN-06D). "inicio": comienza la partida.
+const ALERTAS = {
+  rival: [
+    { f: 660, t: 0, d: 0.12 },
+    { f: 880, t: 0.14, d: 0.18 },
+  ],
+  inicio: [
+    { f: 523.25, t: 0, d: 0.14 },
+    { f: 659.25, t: 0.13, d: 0.14 },
+    { f: 783.99, t: 0.26, d: 0.14 },
+    { f: 1046.5, t: 0.39, d: 0.32 },
+  ],
+};
+
+export function reproducirAlerta(tipo, volumen = 0.25) {
+  const notas = ALERTAS[tipo];
+  if (!notas || !efectosActivos) return;
+  const c = obtenerContexto();
+  if (!c) return;
+  desbloquear();
+  const inicio = c.currentTime + 0.02;
+  notas.forEach(({ f, t, d }) => {
+    const osc = c.createOscillator();
+    const ganancia = c.createGain();
+    osc.type = "triangle";
+    osc.frequency.setValueAtTime(f, inicio + t);
+    ganancia.gain.setValueAtTime(0, inicio + t);
+    ganancia.gain.linearRampToValueAtTime(volumen, inicio + t + 0.015);
+    ganancia.gain.exponentialRampToValueAtTime(0.0001, inicio + t + d);
+    osc.connect(ganancia).connect(c.destination);
+    osc.start(inicio + t);
+    osc.stop(inicio + t + d + 0.02);
+  });
+}
+
 // Para probar desde la consola del navegador (F12): probarSonido("bomba"),
 // probarSonido("electrica"), etc. Muestra si el audio funciona sin jugar.
 if (typeof window !== "undefined") window.probarSonido = reproducirSonido;

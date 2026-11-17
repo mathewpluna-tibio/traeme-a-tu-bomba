@@ -1,12 +1,40 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    // Campos que solo escriben las Cloud Functions (el Admin SDK se salta
+    // estas reglas). Un jugador no puede crearlos con valores de sanción ni
+    // modificarlos después desde el navegador.
+    function camposProtegidos() {
+      return ['estadisticas', 'progresoEventos', 'baneado', 'motivoBaneo',
+              'coronas', 'marcosComprados', 'bannersComprados', 'titulosObtenidos'];
+    }
+
     match /usuarios/{uid} {
       allow read: if request.auth != null;
-      allow write: if request.auth != null && request.auth.uid == uid;
+
+      // El perfil lo crea el propio jugador al registrarse (con sus
+      // estadísticas iniciales), pero nunca ya baneado ni con coronas o
+      // cosméticos regalados.
+      allow create: if request.auth != null
+        && request.auth.uid == uid
+        && !('baneado' in request.resource.data && request.resource.data.baneado == true)
+        && (!('coronas' in request.resource.data) || request.resource.data.coronas == 0)
+        && !('marcosComprados' in request.resource.data)
+        && !('bannersComprados' in request.resource.data)
+        && !('titulosObtenidos' in request.resource.data)
+        && !('progresoEventos' in request.resource.data);
+
+      // Después solo puede cambiar sus datos personales y cosméticos
+      // equipados; los campos protegidos quedan bloqueados.
+      allow update: if request.auth != null
+        && request.auth.uid == uid
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(camposProtegidos());
+
+      allow delete: if false;
 
       // Lista de amigos: solo la ve su dueño y solo la escriben las
-      // Cloud Functions (Admin SDK se salta estas reglas).
+      // Cloud Functions.
       match /amigos/{amigoUid} {
         allow read: if request.auth != null && request.auth.uid == uid;
         allow write: if false;
@@ -21,15 +49,13 @@ service cloud.firestore {
       allow write: if false;
     }
 
-    // Eventos temporales: los ven todos los jugadores; solo se crean,
-    // editan o eliminan desde Cloud Functions (guardarEvento / eliminarEvento,
-    // que exigen el rol admin).
-
     match /guias/{id} {
       allow read: if request.auth != null;
       allow write: if false;
     }
 
+    // Eventos temporales: los ven todos; solo se crean, editan o eliminan
+    // desde Cloud Functions (guardarEvento / eliminarEvento, rol admin).
     match /eventos/{id} {
       allow read: if request.auth != null;
       allow write: if false;
@@ -40,3 +66,4 @@ service cloud.firestore {
     }
   }
 }
+  

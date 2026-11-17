@@ -1,3 +1,5 @@
+import { usePosicionRanking } from "../../hooks/usePosicionRanking";
+
 export default function StatsPanel({ profile, modalidad }) {
   return (
     <section className="pf-section">
@@ -29,10 +31,21 @@ function StatsContent({ profile, modalidad }) {
   }
 
   if (modalidad === "elementales") {
-    return <StatsElementales stats={stats} />;
+    return <StatsElementales stats={stats} posicion={<PosicionRanking profile={profile} modalidad={modalidad} />} />;
   }
 
-  return <StatsEstandarVenenosas stats={stats} />;
+  return <StatsEstandarVenenosas stats={stats} posicion={<PosicionRanking profile={profile} modalidad={modalidad} />} />;
+}
+
+// RQF-PER-06: posición en el ranking global de la modalidad.
+function PosicionRanking({ profile, modalidad }) {
+  const posicion = usePosicionRanking(profile.estadisticas, modalidad);
+  return <StatCard label="Posición en el ranking global" value={posicion ? `#${posicion}` : "..."} />;
+}
+
+// Las vidas pueden ser fraccionarias (MiniBomba quita 0.5).
+function formatoVidas(v) {
+  return Math.round((v || 0) * 100) / 100;
 }
 
 function VistaGeneral({ estadisticas }) {
@@ -54,24 +67,27 @@ function VistaGeneral({ estadisticas }) {
   );
 }
 
-function StatsEstandarVenenosas({ stats }) {
+function StatsEstandarVenenosas({ stats, posicion }) {
   return (
     <div className="pf-stats-grid">
       <StatCard label="Elo" value={stats.elo} />
       <StatCard label="Rango" value={stats.rango} />
+      {posicion}
       <StatCard label="Victorias" value={stats.victorias} />
       <StatCard label="Derrotas" value={stats.derrotas} />
-      <StatCard label="Vidas perdidas" value={stats.vidasPerdidas} />
-      <StatCard label="Partidas sin perder vida" value={stats.partidasSinPerderVida} />
+      <StatCard label="Vidas perdidas" value={formatoVidas(stats.vidasPerdidas)} />
+      <StatCard label="Vidas conservadas" value={formatoVidas(stats.vidasConservadas)} />
+      <StatCard label="Partidas sin perder vida" value={stats.partidasSinPerderVida ?? 0} />
     </div>
   );
 }
 
-function StatsElementales({ stats }) {
+function StatsElementales({ stats, posicion }) {
   return (
     <div className="pf-stats-grid">
       <StatCard label="Elo" value={stats.elo} />
       <StatCard label="Rango" value={stats.rango} />
+      {posicion}
       <StatCard label="Victorias" value={stats.victorias} />
       <StatCard label="Derrotas" value={stats.derrotas} />
       <StatCard label="Empates" value={stats.empates} />

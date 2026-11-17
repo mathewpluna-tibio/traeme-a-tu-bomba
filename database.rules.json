@@ -35,6 +35,10 @@
         ".read": "auth != null",
         "estado": {
           ".write": "auth != null && data.val() === 'esperando' && newData.val() === 'cancelada' && root.child('lobbies').child($lobbyId).child('creador').val() === auth.uid"
+        },
+        "rivalEligiendo": {
+          ".write": "auth != null && root.child('lobbies').child($lobbyId).child('estado').val() === 'esperando' && root.child('lobbies').child($lobbyId).child('creador').val() !== auth.uid && (!root.child('lobbies').child($lobbyId).child('uidRetado').exists() || root.child('lobbies').child($lobbyId).child('uidRetado').val() === auth.uid) && (newData.exists() ? newData.child('uid').val() === auth.uid : data.child('uid').val() === auth.uid)",
+          ".validate": "!newData.exists() || newData.hasChildren(['uid', 'en'])"
         }
       }
     },

@@ -158,3 +158,6 @@
 .lobby-clase-img .sm-card-emoji {
   font-size: 40px;
 }
+/* RQF-AMI-02B: cuenta regresiva del reto */
+.lobby-cuenta strong { color: #ff9633; }
+.reto-toast .reto-cuenta { font-size: 12px; opacity: 0.8; margin: 2px 0 6px; }

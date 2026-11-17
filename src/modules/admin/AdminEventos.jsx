@@ -84,7 +84,7 @@ function FormularioEvento({ inicial, onCancelar, onGuardado }) {
     setGuardando(true);
     try {
       await guardarEventoCallable({ id: f.id || undefined, evento: haciaServidor(f) });
-      onGuardado();
+      onGuardado(f.nombre, !f.id);
     } catch (err) {
       console.error(err);
       setError(err.message || "No se pudo guardar el evento.");
@@ -212,6 +212,8 @@ export default function AdminEventos() {
   const { eventos, cargando, ahora } = useEventos();
   const [editando, setEditando] = useState(null); // null | "nuevo" | evento
   const [error, setError] = useState("");
+  // RQNF-MIS-03: confirmación al administrador de que el evento quedó registrado
+  const [aviso, setAviso] = useState("");
 
   const eliminar = async (e) => {
     if (!window.confirm(`¿Eliminar el evento "${e.nombre}"? Los jugadores dejarán de verlo.`)) return;
@@ -229,7 +231,14 @@ export default function AdminEventos() {
       <FormularioEvento
         inicial={editando === "nuevo" ? { id: null, nombre: "", descripcion: "", inicio: "", fin: "", misiones: [nuevaMision()] } : desdeEvento(editando)}
         onCancelar={() => setEditando(null)}
-        onGuardado={() => setEditando(null)}
+        onGuardado={(nombre, esNuevo) => {
+          setEditando(null);
+          setAviso(
+            esNuevo
+              ? `Evento "${nombre}" registrado correctamente.`
+              : `Evento "${nombre}" actualizado correctamente.`
+          );
+        }}
       />
     );
   }
@@ -238,11 +247,26 @@ export default function AdminEventos() {
     <section>
       <div className="ad-section-head">
         <h2 className="ad-h2">Eventos temporales</h2>
-        <button type="button" className="ad-btn ad-btn--primary" onClick={() => setEditando("nuevo")}>
+        <button
+          type="button"
+          className="ad-btn ad-btn--primary"
+          onClick={() => {
+            setAviso("");
+            setEditando("nuevo");
+          }}
+        >
           + Nuevo evento
         </button>
       </div>
 
+      {aviso && (
+        <p className="ad-ok" role="status">
+          {aviso}
+          <button type="button" className="ad-ok-cerrar" onClick={() => setAviso("")} aria-label="Cerrar aviso">
+            Cerrar
+          </button>
+        </p>
+      )}
       {error && <p className="ad-error">{error}</p>}
       {cargando && <p className="ad-muted">Cargando...</p>}
       {!cargando && eventos.length === 0 && <p className="ad-muted">Aún no hay eventos. Crea el primero.</p>}

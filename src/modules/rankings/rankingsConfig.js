@@ -21,3 +21,15 @@ export const MODALIDADES = [
   { key: "venenosas", label: "Bombas Venenosas" },
   { key: "elementales", label: "Bombas Elementales" },
 ];
+
+export const CATEGORIA_POR_DEFECTO = {
+  estandar: "elo",
+  venenosas: "elo",
+  elementales: "casillasMarcadas",
+};
+
+export const DESEMPATES = {
+  elo: [["victorias", "desc"], ["derrotas", "asc"]],
+  victorias: [["derrotas", "asc"]],
+  casillasMarcadas: [["victorias", "desc"]],
+};

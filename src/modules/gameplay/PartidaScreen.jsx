@@ -12,6 +12,7 @@ import FaseJuego from "./FaseJuego";
 import FaseJuegoElemental from "./FaseJuegoElemental";
 import InvitacionesRetos from "../lobby/InvitacionesRetos";
 import LobbyEntrante from "../lobby/LobbyEntrante";
+import AvisoInicioPartida from "./AvisoInicioPartida";
 
 const NOMBRE_MODALIDAD = {
   estandar: "Estándar",
@@ -61,8 +62,16 @@ export default function PartidaScreen({
     .filter(Boolean)
     .join(" · ");
 
+  const uidRival = Object.keys(partida.jugadores || {}).find((uid) => uid !== user?.uid);
+
   return (
     <div className="gp-page">
+      <AvisoInicioPartida
+        key={partidaId}
+        partidaId={partidaId}
+        partida={partida}
+        nombreRival={uidRival ? perfiles[uidRival]?.username : null}
+      />
       <div className="gp-container" ref={contenedorRef}>
         <p className="gp-modalidad">{subtitulo}</p>
 

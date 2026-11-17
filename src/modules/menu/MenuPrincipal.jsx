@@ -224,8 +224,12 @@ export default function MenuPrincipal() {
         modalidad={state.context.modalidad}
         clase={state.context.clase}
         onCancelar={() => send({ type: "CANCELAR_BUSQUEDA" })}
-        onCerrado={() => {
-          alert("El lobby se cerró (rechazaron el reto o fue cancelado).");
+        onCerrado={(motivo) => {
+          alert(
+            motivo === "expirada"
+              ? "El reto expiró: tu amigo no respondió a tiempo."
+              : "El lobby se cerró (rechazaron el reto o fue cancelado)."
+          );
           send({ type: "CANCELAR_BUSQUEDA" });
         }}
       />

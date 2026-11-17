@@ -21,13 +21,11 @@ export async function unirseACola(modalidad, uid, clase, esInvitado) {
     timestamp: Date.now(),
   });
 
-  if (!esInvitado) {
-    await setDoc(
-      doc(db, "preferencias", uid),
-      { ultimaModalidad: modalidad, ultimaClase: clase || null},
-      { merge: true }
-    );
-  }
+  await setDoc(
+    doc(db, "preferencias", uid),
+    { ultimaModalidad: modalidad, ultimaClase: clase || null },
+    { merge: true }
+  );
 
 
 }

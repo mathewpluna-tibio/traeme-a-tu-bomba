@@ -1,12 +1,7 @@
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { db } from "./config";
 
-/**
- * Estructura base de estadísticas para un usuario nuevo, compartida entre
- * el registro por correo (RegisterForm) y el alta automática por Google
- * (AuthContext.signInWithGoogle), para que ambos caminos generen el mismo
- * documento en `usuarios/{uid}`.
- */
+
 export function estadisticasIniciales() {
   return {
     estandar: {
@@ -15,6 +10,8 @@ export function estadisticasIniciales() {
       victorias: 0,
       derrotas: 0,
       vidasPerdidas: 0,
+      vidasQuitadas: 0,
+      vidasConservadas: 0,
       partidasSinPerderVida: 0,
     },
     venenosas: {
@@ -23,6 +20,8 @@ export function estadisticasIniciales() {
       victorias: 0,
       derrotas: 0,
       vidasPerdidas: 0,
+      vidasQuitadas: 0,
+      vidasConservadas: 0,
       partidasSinPerderVida: 0,
     },
     elementales: {
@@ -37,11 +36,6 @@ export function estadisticasIniciales() {
   };
 }
 
-/**
- * Crea el documento de perfil en Firestore únicamente si todavía no existe
- * (uid no encontrado en `usuarios`). Se usa en el alta manual (correo) y en
- * el primer ingreso con Google, donde no pasamos por validarUsername.
- */
 export async function crearPerfilSiNoExiste(uid, { username, email, fotoPerfil = "" }) {
   const ref = doc(db, "usuarios", uid);
   const snap = await getDoc(ref);

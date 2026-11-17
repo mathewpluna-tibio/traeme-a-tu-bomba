@@ -1,34 +1,39 @@
 import { useState } from "react";
 import { useRanking } from "../../hooks/useRanking";
-import { MODALIDADES, CATEGORIAS_POR_MODALIDAD } from "./rankingsConfig";
+import { MODALIDADES, CATEGORIAS_POR_MODALIDAD, CATEGORIA_POR_DEFECTO } from "./rankingsConfig";
+import { useAuth } from "../../context/AuthContext";
 import UserBomb from "../../assets/UserBomb.png";
 import "./RankingsPage.css";
 
 const ICONO_POR_RANGO = {
-  "Cadetes Bomberos": "💥",
-  "Entusiastas de las Explosiones": "💥",
-  "Genios Explosivos": "💥",
-  "Señor de las Bombas": "💥",
+  "Cadetes Bomberos": "",
+  "Entusiastas de las Explosiones": "",
+  "Genios Explosivos": "",
+  "Señor de las Bombas": "",
 };
 
 function medalFor(posicion) {
-  if (posicion === 1) return "🥇";
-  if (posicion === 2) return "🥈";
-  if (posicion === 3) return "🥉";
+  if (posicion === 1) return "1";
+  if (posicion === 2) return "2";
+  if (posicion === 3) return "3";
   return null;
 }
 
 export default function RankingsPage({ onVolver, onVerPerfil }) {
+  const { user } = useAuth();
   const [modalidad, setModalidad] = useState("estandar");
-  const [categoria, setCategoria] = useState("elo");
+  const [categoria, setCategoria] = useState(CATEGORIA_POR_DEFECTO.estandar);
 
   const categoriasDisponibles = CATEGORIAS_POR_MODALIDAD[modalidad];
   const { jugadores, loading, error } = useRanking(modalidad, categoria);
 
   const cambiarModalidad = (nuevaModalidad) => {
     setModalidad(nuevaModalidad);
-    setCategoria("elo");
+    setCategoria(CATEGORIA_POR_DEFECTO[nuevaModalidad] || "elo");
   };
+
+  // RQF-RAN-02C: posición del propio jugador si está en el Top 100
+  const miFila = user ? jugadores.find((j) => j.uid === user.uid) : null;
 
   const etiquetaCategoria = categoriasDisponibles.find((c) => c.key === categoria)?.label;
 
@@ -38,7 +43,6 @@ export default function RankingsPage({ onVolver, onVerPerfil }) {
 
       <header className="rk-header">
         <h1 className="rk-title">
-          <span className="rk-title-icon">🏆</span>
           Ranking Competitivo
         </h1>
 
@@ -73,6 +77,12 @@ export default function RankingsPage({ onVolver, onVerPerfil }) {
         <p className="rk-status">Aún no hay jugadores en este ranking.</p>
       )}
 
+      {!loading && !error && miFila && (
+        <p className="rk-my-position">
+          Tu posición: <strong>#{miFila.posicion}</strong> de {jugadores.length}
+        </p>
+      )}
+
       {!loading && !error && jugadores.length > 0 && (
         <div className="rk-table">
           <div className="rk-table-head">
@@ -88,7 +98,11 @@ export default function RankingsPage({ onVolver, onVerPerfil }) {
               return (
                 <button
                   key={j.uid}
-                  className={"rk-row" + (j.posicion <= 3 ? " rk-row--top" : "")}
+                  className={
+                    "rk-row" +
+                    (j.posicion <= 3 ? " rk-row--top" : "") +
+                    (j.uid === user?.uid ? " rk-row--yo" : "")
+                  }
                   onClick={() => onVerPerfil(j.uid)}
                 >
                   <span className="rk-col rk-col-pos">
@@ -102,6 +116,7 @@ export default function RankingsPage({ onVolver, onVerPerfil }) {
                   <span className="rk-col rk-col-player">
                     <img className="rk-avatar" src={j.fotoPerfil || UserBomb} alt={j.username} />
                     <span className="rk-name">{j.username}</span>
+                    {j.uid === user?.uid && <span className="rk-yo-badge">Tú</span>}
                   </span>
 
                   <span className="rk-col rk-col-tier">

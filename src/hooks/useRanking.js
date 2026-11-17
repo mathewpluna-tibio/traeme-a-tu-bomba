@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { collection, query, orderBy, limit, getDocs } from "firebase/firestore";
 import { db } from "../firebase/config";
+import { DESEMPATES } from "../modules/rankings/rankingsConfig";
 
 export function useRanking(modalidad, categoria) {
   const [jugadores, setJugadores] = useState([]);
@@ -15,7 +16,12 @@ export function useRanking(modalidad, categoria) {
       setError("");
       try {
         const campo = `estadisticas.${modalidad}.${categoria}`;
-        const q = query(collection(db, "usuarios"), orderBy(campo, "desc"), limit(100));
+        // RQNF-RAN-01C: los desempates se resuelven en la misma consulta
+        // indexada de Firestore con orderBy() adicionales.
+        const desempates = (DESEMPATES[categoria] || []).map(([c, dir]) =>
+          orderBy(`estadisticas.${modalidad}.${c}`, dir)
+        );
+        const q = query(collection(db, "usuarios"), orderBy(campo, "desc"), ...desempates, limit(100));
         const snapshot = await getDocs(q);
         if (cancelado) return;
 

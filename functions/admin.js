@@ -6,14 +6,6 @@ const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { CATALOGO_TIENDA } = require("./tienda");
 const { TIPOS_EVENTO, invalidarCacheEventos } = require("./eventos");
 
-/**
- * Vista Admin (RQF-ADM-01..04).
- *
- * El rol de administrador es un custom claim `admin: true` en Firebase
- * Authentication (se asigna con functions/scripts/asignarAdmin.js). Cada
- * función de este archivo lo valida en el servidor: ocultar el panel en el
- * frontend NO es seguridad, esto sí.
- */
 function exigirAdmin(request) {
   if (!request.auth) {
     throw new HttpsError("unauthenticated", "Debes iniciar sesión.");
@@ -73,6 +65,16 @@ function validarMision(m, i) {
   };
 }
 
+// RQNF-ADM-02B: límites de las fechas de un evento.
+const HORA_MS = 60 * 60 * 1000;
+const DIA_MS = 24 * HORA_MS;
+const LIMITES_EVENTO = {
+  duracionMinMs: HORA_MS, // dura al menos 1 hora
+  duracionMaxMs: 30 * DIA_MS, // dura como máximo 30 días
+  anticipacionMaxMs: 60 * DIA_MS, // empieza dentro de los próximos 60 días
+  margenPasadoMs: 5 * 60 * 1000, // tolerancia por diferencia de reloj del navegador
+};
+
 // RQF-ADM-02 · crear / editar evento
 const guardarEvento = onCall(async (request) => {
   const adminUid = exigirAdmin(request);
@@ -89,11 +91,37 @@ const guardarEvento = onCall(async (request) => {
   if (finMs <= inicioMs) {
     throw new HttpsError("invalid-argument", "La fecha de fin debe ser posterior a la de inicio.");
   }
-  if (!Array.isArray(evento.misiones) || evento.misiones.length < 1 || evento.misiones.length > 8) {
-    throw new HttpsError("invalid-argument", "El evento debe tener entre 1 y 8 misiones.");
+  const duracion = finMs - inicioMs;
+  if (duracion < LIMITES_EVENTO.duracionMinMs) {
+    throw new HttpsError("invalid-argument", "El evento debe durar al menos 1 hora.");
+  }
+  if (duracion > LIMITES_EVENTO.duracionMaxMs) {
+    throw new HttpsError("invalid-argument", "El evento puede durar como máximo 30 días.");
+  }
+  const ahora = Date.now();
+  if (inicioMs > ahora + LIMITES_EVENTO.anticipacionMaxMs) {
+    throw new HttpsError("invalid-argument", "El evento debe empezar dentro de los próximos 60 días.");
+  }
+  if (finMs <= ahora) {
+    throw new HttpsError("invalid-argument", "La fecha de fin ya pasó.");
   }
 
   const firestore = getFirestore();
+  // Un evento nuevo no puede empezar en el pasado. Al editar uno que ya
+  // comenzó se permite conservar su inicio original.
+  let inicioOriginalMs = null;
+  if (id) {
+    const actual = await firestore.collection("eventos").doc(id).get();
+    if (!actual.exists) throw new HttpsError("not-found", "El evento no existe.");
+    inicioOriginalMs = actual.data().inicio?.toMillis?.() ?? null;
+  }
+  const inicioCambio = inicioOriginalMs === null || Math.abs(inicioMs - inicioOriginalMs) >= 60 * 1000;
+  if (inicioCambio && inicioMs < ahora - LIMITES_EVENTO.margenPasadoMs) {
+    throw new HttpsError("invalid-argument", "La fecha de inicio no puede estar en el pasado.");
+  }
+  if (!Array.isArray(evento.misiones) || evento.misiones.length < 1 || evento.misiones.length > 8) {
+    throw new HttpsError("invalid-argument", "El evento debe tener entre 1 y 8 misiones.");
+  }
 
   // Un solo evento a la vez: así el panel "Evento especial" es inequívoco.
   const posibles = await firestore.collection("eventos").where("fin", ">", Timestamp.fromMillis(inicioMs)).get();
@@ -117,7 +145,6 @@ const guardarEvento = onCall(async (request) => {
   let ref;
   if (id) {
     ref = firestore.collection("eventos").doc(id);
-    if (!(await ref.get()).exists) throw new HttpsError("not-found", "El evento no existe.");
     await ref.set(datos, { merge: true });
   } else {
     ref = firestore.collection("eventos").doc();

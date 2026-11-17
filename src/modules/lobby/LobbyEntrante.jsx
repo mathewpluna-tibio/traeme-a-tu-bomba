@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ref, onValue } from "firebase/database";
+import { ref, onValue, set, remove, onDisconnect, serverTimestamp } from "firebase/database";
 import { httpsCallable } from "firebase/functions";
 import { rtdb, functions } from "../../firebase/config";
 import { useAuth } from "../../context/AuthContext";
@@ -25,7 +25,30 @@ export default function LobbyEntrante({ lobbyId, onCerrar }) {
     );
   }, [lobbyId]);
 
-  const valido = lobby && lobby.estado === "esperando" && lobby.creador !== user?.uid;
+  const [ahora, setAhora] = useState(() => Date.now());
+  const vencido = !!lobby?.expiraEn && ahora >= lobby.expiraEn;
+  const valido = lobby && lobby.estado === "esperando" && lobby.creador !== user?.uid && !vencido;
+
+  // RQF-MEN-06D: avisa al creador que su rival ya abrió el lobby y está
+  // eligiendo clase. Se borra si cierra la ventana o se desconecta.
+  useEffect(() => {
+    if (!valido || !user) return;
+    const rivalRef = ref(rtdb, `lobbies/${lobbyId}/rivalEligiendo`);
+    set(rivalRef, { uid: user.uid, en: serverTimestamp() }).catch(() => {});
+    const alDesconectar = onDisconnect(rivalRef);
+    alDesconectar.remove().catch(() => {});
+    return () => {
+      alDesconectar.cancel().catch(() => {});
+      remove(rivalRef).catch(() => {});
+    };
+  }, [valido, lobbyId, user]);
+
+  // RQF-AMI-02B: el reto deja de poder aceptarse al vencer su tiempo.
+  useEffect(() => {
+    if (!lobby?.expiraEn) return;
+    const id = setInterval(() => setAhora(Date.now()), 500);
+    return () => clearInterval(id);
+  }, [lobby?.expiraEn]);
 
   const unirse = async (clase) => {
     if (uniendose) return;
@@ -64,7 +87,9 @@ export default function LobbyEntrante({ lobbyId, onCerrar }) {
             <p className="lobby-texto">
               {lobby && lobby.creador === user?.uid
                 ? "Este es tu propio lobby."
-                : "Este lobby ya no está disponible (la partida inició o fue cancelada)."}
+                : lobby && (lobby.estado === "expirada" || vencido)
+                  ? "Este reto expiró: no se respondió a tiempo."
+                  : "Este lobby ya no está disponible (la partida inició o fue cancelada)."}
             </p>
             <button className="lobby-btn" onClick={onCerrar}>Cerrar</button>
           </>

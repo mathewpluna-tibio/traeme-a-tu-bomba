@@ -372,3 +372,28 @@
   .gp-board { padding: 12px; }
   .gp-board-grid { gap: 4px; --cell: max(26px, min(56px, calc((100vw - 60px) / var(--cols)))); }
 }
+/* RQF-MEN-06D: aviso de rival encontrado al iniciar la partida (no bloquea) */
+.gp-aviso-inicio {
+  position: fixed;
+  top: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 50;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 12px 22px;
+  border-radius: 14px;
+  background: rgba(20, 21, 28, 0.94);
+  border: 1px solid rgba(255, 150, 51, 0.6);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  color: #f4f4f8;
+  text-align: center;
+  animation: gp-aviso-entrada 0.35s ease-out, gp-aviso-salida 0.4s ease-in 2.4s forwards;
+}
+.gp-aviso-inicio-titulo { font-weight: 900; font-size: 18px; color: #ff9633; }
+.gp-aviso-inicio-texto { font-size: 14px; }
+@keyframes gp-aviso-entrada { from { opacity: 0; transform: translate(-50%, -12px); } to { opacity: 1; transform: translate(-50%, 0); } }
+@keyframes gp-aviso-salida { to { opacity: 0; transform: translate(-50%, -8px); } }

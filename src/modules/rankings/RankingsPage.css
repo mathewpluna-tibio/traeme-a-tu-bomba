@@ -109,6 +109,24 @@
 .rk-row:last-child { border-bottom: none; }
 .rk-row:hover { background: rgba(255, 255, 255, 0.04); }
 .rk-row--top { background: rgba(255, 150, 51, 0.06); }
+/* RQF-RAN-02C: fila del propio jugador */
+.rk-row--yo { background: rgba(111, 220, 140, 0.12); box-shadow: inset 4px 0 0 #6fdc8c; }
+.rk-row--yo:hover { background: rgba(111, 220, 140, 0.18); }
+.rk-yo-badge {
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #6fdc8c;
+  color: #10331a;
+  font-size: 11px;
+  font-weight: 800;
+}
+.rk-my-position {
+  margin: 0 0 12px;
+  color: var(--rk-text-muted);
+  font-weight: 700;
+}
+.rk-my-position strong { color: #6fdc8c; font-size: 18px; }
 
 .rk-col { display: flex; align-items: center; }
 .rk-col-pos { font-weight: 800; }

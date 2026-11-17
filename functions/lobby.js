@@ -9,23 +9,30 @@ const {
   ALTO_TABLERO,
 } = require("./elementales");
 
-/**
- * Lobby privado y retos (RQF-MEN-05/06, RQF-SOC-02).
- *
- * RTDB (se escribe SOLO desde aquí con el Admin SDK):
- *   lobbies/{lobbyId}        -> { creador, creadorUsername, modalidad, clase?, uidRetado?,
- *                                 estado: "esperando" | "iniciada" | "cancelada", creadaEn }
- *   lobbyActivo/{uid}        -> lobbyId (el lobby abierto de ese jugador, máx. uno)
- *   invitaciones/{uid}/{lobbyId} -> { de, deUsername, modalidad, creadaEn }   (retos)
- *
- * El "enlace de invitación irrepetible" es la URL con ?lobby=<lobbyId>: el id
- * es una llave push de RTDB (no adivinable) y deja de servir en cuanto el
- * lobby pasa a "iniciada" o "cancelada" (RQNF-MEN-05).
- */
-
 const MODALIDADES = ["estandar", "venenosas", "elementales"];
 const CLASES = ["minibomba", "bomba", "bombota", "aleatoria"];
 const DURACION_TURNO_ELEMENTAL_MS = 7000;
+// RQF-AMI-02B: tiempo que tiene el jugador retado para responder.
+const DURACION_RETO_MS = 60 * 1000;
+// Margen para diferencias de reloj entre el navegador y el servidor.
+const MARGEN_EXPIRACION_MS = 1500;
+
+function retoVencido(lobby, ahora = Date.now()) {
+  return !!lobby?.expiraEn && ahora >= lobby.expiraEn;
+}
+
+// RQNF-AMI-02: el lobby pasa a "expirada" y se borra la invitación; el
+// retador y el retado escuchan ese estado y muestran el aviso.
+async function expirarLobby(rtdb, lobbyId, lobby) {
+  const updates = {
+    [`lobbies/${lobbyId}/estado`]: "expirada",
+    [`lobbyActivo/${lobby.creador}`]: null,
+  };
+  if (lobby.uidRetado) {
+    updates[`invitaciones/${lobby.uidRetado}/${lobbyId}`] = null;
+  }
+  await rtdb.ref().update(updates);
+}
 
 function resolverClase(clase) {
   if (clase !== "aleatoria") return clase;
@@ -119,7 +126,10 @@ const crearLobby = onCall(async (request) => {
     creadaEn: ahora,
   };
   if (claseFinal) lobby.clase = claseFinal;
-  if (uidRetado) lobby.uidRetado = uidRetado;
+  if (uidRetado) {
+    lobby.uidRetado = uidRetado;
+    lobby.expiraEn = ahora + DURACION_RETO_MS;
+  }
 
   const updates = {
     [`lobbies/${lobbyId}`]: lobby,
@@ -132,11 +142,38 @@ const crearLobby = onCall(async (request) => {
       deUsername: creadorUsername,
       modalidad,
       creadaEn: ahora,
+      expiraEn: lobby.expiraEn,
     };
   }
   await rtdb.ref().update(updates);
 
-  return { lobbyId };
+  return { lobbyId, expiraEn: lobby.expiraEn || null };
+});
+
+// RQNF-AMI-02: lo llaman el retador o el retado cuando su contador llega a
+// cero. El servidor confirma con su propio reloj que el reto ya venció.
+const expirarReto = onCall(async (request) => {
+  const uid = request.auth?.uid;
+  if (!uid) {
+    throw new HttpsError("unauthenticated", "Debes iniciar sesión.");
+  }
+  const lobbyId = request.data?.lobbyId;
+  if (!lobbyId || typeof lobbyId !== "string") {
+    throw new HttpsError("invalid-argument", "Falta el lobby.");
+  }
+  const rtdb = getDatabase();
+  const lobby = (await rtdb.ref(`lobbies/${lobbyId}`).once("value")).val();
+  if (!lobby || (lobby.creador !== uid && lobby.uidRetado !== uid)) {
+    throw new HttpsError("permission-denied", "Este reto no es tuyo.");
+  }
+  if (lobby.estado !== "esperando") {
+    return { estado: lobby.estado };
+  }
+  if (!retoVencido(lobby, Date.now() + MARGEN_EXPIRACION_MS)) {
+    return { estado: "esperando", expiraEn: lobby.expiraEn || null };
+  }
+  await expirarLobby(rtdb, lobbyId, lobby);
+  return { estado: "expirada" };
 });
 
 const cancelarLobby = onCall(async (request) => {
@@ -205,6 +242,11 @@ const unirseALobby = onCall(async (request) => {
   if (!lobby || lobby.estado !== "esperando") {
     throw new HttpsError("failed-precondition", "Este enlace ya no es válido.");
   }
+  // RQF-AMI-02B: un reto vencido ya no se puede aceptar.
+  if (retoVencido(lobby)) {
+    await expirarLobby(rtdb, lobbyId, lobby);
+    throw new HttpsError("deadline-exceeded", "El reto expiró: no se respondió a tiempo.");
+  }
   if (lobby.creador === uid) {
     throw new HttpsError("failed-precondition", "No puedes unirte a tu propio lobby.");
   }
@@ -222,6 +264,7 @@ const unirseALobby = onCall(async (request) => {
   const reserva = await lobbyRef.transaction((actual) => {
     if (actual === null) return actual;
     if (actual.estado !== "esperando") return undefined;
+    if (retoVencido(actual)) return undefined;
     return { ...actual, estado: "iniciada" };
   });
   if (!reserva.committed) {
@@ -330,4 +373,4 @@ const unirseALobby = onCall(async (request) => {
   return { partidaId };
 });
 
-module.exports = { crearLobby, cancelarLobby, rechazarReto, unirseALobby };
+module.exports = { crearLobby, cancelarLobby, rechazarReto, unirseALobby, expirarReto };
