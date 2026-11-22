@@ -26,7 +26,6 @@ export default function SeleccionClase({ tipoAccion, modalidad, uidRetado, onCon
       return;
     }
 
-    // RQF-MEN-05: crear el lobby privado (y el reto, si se eligió a alguien)
     try {
       const resultado = await crearLobbyCallable({ modalidad, clase: claseId, uidRetado: uidRetado || null });
       onConfirmar(claseId, resultado.data.lobbyId);

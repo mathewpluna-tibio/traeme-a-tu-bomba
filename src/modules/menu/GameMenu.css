@@ -352,8 +352,10 @@
 
 .gm-panel-header {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
+  gap: 4px 8px;
   margin-bottom: 14px;
 }
 
@@ -372,7 +374,8 @@
 }
 
 .gm-panel-timer {
-  font-size: 12px;
+  font-size: 11px;
+  white-space: nowrap;
   color: var(--gm-text-muted);
   display: flex;
   align-items: center;
@@ -399,6 +402,13 @@
 
 .gm-mission-icon {
   font-size: 18px;
+  color: #fff;
+  flex-shrink: 0;
+}
+
+/* Misión completada */
+.gm-mission--done {
+  background: linear-gradient(90deg, #2f9e5b, #3fbf72);
 }
 
 .gm-mission-info {
@@ -408,13 +418,14 @@
   min-width: 0;
 }
 
+/* El texto completo de la misión se ve en varias líneas (antes se cortaba). */
 .gm-mission-title {
   font-weight: 800;
   font-size: 13px;
+  line-height: 1.25;
   color: #fff;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .gm-mission-subtitle {

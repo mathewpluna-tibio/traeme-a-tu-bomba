@@ -4,20 +4,10 @@ import { IMAGEN_BOMBA, bombaMasFuerte } from "./bombasAssets";
 import { animarOcultar } from "./efectos/animaciones";
 import { useServerTimeOffset } from "../../hooks/useServerTimeOffset";
 
-// RQF-GAM: la bomba recién colocada se muestra 3 segundos y luego se oculta.
 const TIEMPO_VISIBLE_MS = 3000;
 
 const claveBomba = (clave, b) => `${clave}|${b.uid}|${b.colocadaEn}`;
 
-/**
- * Tablero de Estándar y Bombas Venenosas. Las animaciones de colocación,
- * activación y detonación las dispara `useEfectosPartida` (PartidaScreen).
- *
- * Los 3 segundos de visibilidad se cuentan desde que ESTE cliente ve llegar la
- * bomba, así no dependen de que el reloj del equipo coincida con el del
- * servidor. Solo si la bomba ya estaba al abrir/recargar la partida se usa su
- * antigüedad real (con el desfase del servidor).
- */
 export default function Tablero({ casillas = {}, onCasillaClick, deshabilitado, casillaEnProceso }) {
   const { filas, columnas } = calcularDimensiones(casillas);
   const offset = useServerTimeOffset();

@@ -47,11 +47,10 @@ export default function ProfileHeader({
           title="Copiar ID"
           onClick={() => navigator.clipboard?.writeText(uid)}
         >
-          ID: {uid} 📋
+          ID: {uid}
         </button>
       </div>
 
-      {/* RQF-SOC-02: solo al ver el perfil de OTRO jugador */}
       {!isOwnProfile && (
         <div className="pf-actions">
           <button
@@ -59,7 +58,7 @@ export default function ProfileHeader({
             disabled={esAmigo || solicitudEnviada}
             onClick={() => onAddFriend(uid)}
           >
-            {esAmigo ? "✓ Amigos" : solicitudEnviada ? "Solicitud enviada ✓" : "➕ Agregar amigo"}
+            {esAmigo ? "✓ Amigos" : solicitudEnviada ? "Solicitud enviada ✓" : "Agregar amigo"}
           </button>
           <button
             className="pf-btn pf-btn--primary"
@@ -67,7 +66,7 @@ export default function ProfileHeader({
             onClick={() => onChallenge(uid)}
             title={!isOnline ? "El jugador debe estar en línea para retarlo" : undefined}
           >
-            ⚔️ Retar a partida privada
+            Retar a partida privada
           </button>
         </div>
       )}

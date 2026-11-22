@@ -27,7 +27,7 @@ if (import.meta.env.DEV && import.meta.env.VITE_USE_EMULATORS === "true") {
   connectFirestoreEmulator(db, "localhost", 8080);
   connectDatabaseEmulator(rtdb, "localhost", 9000);
   connectFunctionsEmulator(functions, "localhost", 5001);
-  console.log("🔧 Conectado a emuladores locales de Firebase");
+  console.log("Conectado a emuladores locales de Firebase");
 } else {
-  console.log("🌐 Conectado a Firebase real (producción)");
+  console.log("Conectado a Firebase real (producción)");
 }

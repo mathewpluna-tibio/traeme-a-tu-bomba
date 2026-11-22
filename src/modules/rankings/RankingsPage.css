@@ -131,7 +131,39 @@
 .rk-col { display: flex; align-items: center; }
 .rk-col-pos { font-weight: 800; }
 .rk-pos-number { color: var(--rk-text-muted); font-size: 14px; }
-.rk-medal { font-size: 18px; }
+/* Top 3 del ranking */
+.rk-pos-top {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  font-size: 15px;
+  font-weight: 900;
+  color: #fff;
+}
+.rk-pos-top--1 {
+  background: linear-gradient(135deg, #e6fbff 0%, #6fd6ff 30%, #1f8bff 60%, #b8f1ff 100%);
+  color: #06294d;
+  box-shadow: 0 0 10px rgba(80, 200, 255, 0.85), 0 0 2px #fff inset;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.6);
+  animation: rk-brillo 2.4s ease-in-out infinite;
+}
+.rk-pos-top--2 {
+  background: linear-gradient(135deg, #fff1b8 0%, #ffd23f 40%, #c99212 100%);
+  color: #4a3200;
+  box-shadow: 0 0 6px rgba(255, 200, 60, 0.6);
+}
+.rk-pos-top--3 {
+  background: linear-gradient(135deg, #ffffff 0%, #d6dbe3 45%, #8d96a3 100%);
+  color: #2a2f37;
+  box-shadow: 0 0 6px rgba(210, 220, 235, 0.5);
+}
+@keyframes rk-brillo {
+  0%, 100% { box-shadow: 0 0 8px rgba(80, 200, 255, 0.7), 0 0 2px #fff inset; }
+  50% { box-shadow: 0 0 16px rgba(120, 220, 255, 1), 0 0 3px #fff inset; }
+}
 
 .rk-col-player { gap: 10px; min-width: 0; }
 .rk-avatar { width: 34px; height: 34px; border-radius: 50%; object-fit: cover; background: #333; flex-shrink: 0; }

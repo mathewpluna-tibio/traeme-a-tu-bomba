@@ -36,7 +36,7 @@ const DURACION_TURNO_ELEMENTAL_MS = 7000;
 const GRACIA_TURNO_ELEMENTAL_MS = 2500;
 
 function validarAccionEnTiempoElemental(partida, { numeroTurno, enviadoEn }) {
-  // La jugada pertenece al turno que el jugador veía; si ya cambió, no se aplica.
+ 
   if (numeroTurno != null && numeroTurno !== partida.numeroTurno) {
     throw new HttpsError("failed-precondition", "Se acabó el tiempo de tu turno.");
   }
@@ -68,22 +68,44 @@ const MAPA_LEETSPEAK = {
   "9": "g",
 };
 
+
+const PALABRAS_PERMITIDAS = [
+  "computadora", "computacion", "computar", "computo", "computa", "computer",
+  "disputa", "disputo", "diputado", "diputada", "diputa", "imputa", "imputo",
+  "reputacion", "reputa", "amputa",
+  "calculo", "vehiculo", "articulo", "circulo", "ridiculo", "curriculo", "cubiculo",
+  "capitolio", "epitome", "pitonisa", "piton",
+  "escoger", "recoger", "acoger", "encoger",
+  "sexto", "sexta", "sexteto", "sussex", "essex",
+  "analisis", "analiza", "analog", "canal", "banal", "anales",
+  "documento", "cumple", "cumbia", "cumbre", "acumula", "cucumber", "cumulo",
+  "vergara", "scrap", "cocktail", "coctel", "peacock", "hancock", "dickens",
+  "scunthorpe", "shitake", "fagot",
+].map((p) => normalizar(p)).sort((a, b) => b.length - a.length);
+
 function normalizar(texto) {
-  let resultado = texto.toLowerCase();
+  let resultado = texto.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   resultado = resultado.split("").map((c) => MAPA_LEETSPEAK[c] ?? c).join("");
-  resultado = resultado.replace(/[\s\-_.*+~^]/g, "");
+  resultado = resultado.replace(/[^a-z0-9]/g, "");
   resultado = resultado.replace(/(.)\1+/g, "$1");
   return resultado;
 }
 
+function quitarPalabrasPermitidas(textoNormalizado) {
+  let resultado = textoNormalizado;
+  for (const permitida of PALABRAS_PERMITIDAS) {
+    resultado = resultado.split(permitida).join("#");
+  }
+  return resultado;
+}
+
+// Busca la palabra prohibida en cualquier parte del nombre (inicio, medio o
+// final), así "xxxput0m" o "elputo123" no pasan el filtro.
 function contienePalabraProhibida(textoNormalizado, listaPalabras) {
+  const texto = quitarPalabrasPermitidas(textoNormalizado);
   return listaPalabras.some((palabra) => {
     const palabraNorm = normalizar(palabra);
-    return (
-      textoNormalizado === palabraNorm ||
-      textoNormalizado.startsWith(palabraNorm) ||
-      textoNormalizado.endsWith(palabraNorm)
-    );
+    return palabraNorm.length > 0 && texto.includes(palabraNorm);
   });
 }
 
@@ -325,9 +347,6 @@ const candidatosValidos = candidatos.filter((c) => {
     updates[`colaEspera/${modalidad}/${rival.uid}`] = null;
 
     if (esElementales) {
-      // Elementales no tiene selección de tablero al azar ni rondas: el
-      // tablero es fijo (el rectángulo más grande) y la partida arranca
-      // "en_curso" de inmediato, sin pasar por "generando_tablero".
       const indiceAzul = Math.floor(Math.random() * 2);
       const uidAzul = indiceAzul === 0 ? uid : rival.uid;
       const uidRojo = indiceAzul === 0 ? rival.uid : uid;
@@ -739,9 +758,6 @@ exports.verificarTimeoutColocacion = onCall(async (request) => {
     return { expirado: false };
   }
 
-  // --- NUEVO: verificar si hay alguna bomba colocada hace menos de 3s ---
-  // Si la hay, esperamos a que termine su visibilidad antes de avanzar,
-  // para no cortar la fase mientras una bomba sigue mostrándose.
   const TIEMPO_VISIBLE_MS = 3000;
   const casillas = partida.casillas || {};
   let bombaMasReciente = 0;
@@ -773,8 +789,6 @@ function siguienteInicioColocacion(tipoFin, uidQueActivo, uidRival) {
   return uidRival;
 }
 
-// Duración (ms) del sonido de detonación de cada clase en el cliente
-// (src/assets/sonidos). En Estándar la ronda espera a que termine.
 const DURACION_SONIDO_DETONACION_MS = { minibomba: 2400, bomba: 2200, bombota: 3700 };
 
 function duracionSonidoDetonacion(bombas) {
@@ -783,7 +797,6 @@ function duracionSonidoDetonacion(bombas) {
 
 const esperar = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-// --- Helper: arma una nueva ronda (o resuelve fin de partida en ronda 10) ---
 async function iniciarNuevaRonda(partidaId, uidInicial) {
   const partidaSnap = await rtdb.ref(`partidas/${partidaId}`).once("value");
   const partida = partidaSnap.val();
@@ -949,9 +962,6 @@ exports.activarCasilla = onCall(async (request) => {
     const vidasActuales = partida.jugadores[uid].vidas;
     const vidasNuevas = Math.max(0, vidasActuales - danoTotal);
 
-    // RQF-TAB-03 / Estándar: la casilla queda detonada y el turno se congela
-    // (turnoJuego = null) mientras ambos clientes reproducen la animación y el
-    // sonido de la explosión. Solo al terminar el audio cambia la ronda.
     const duracionDetonacion = duracionSonidoDetonacion(bombas);
     await rtdb.ref(`partidas/${partidaId}`).update({
       [`casillas/${casillaClave}/detonada`]: true,
@@ -1220,7 +1230,6 @@ exports.usarBombaElemental = onCall(async (request) => {
   }
 
   // Los clientes usan `ultimaBomba` para reproducir la animación y el sonido
-  // de la bomba en ambos tableros (RQF-TAB-03).
   actualizaciones.ultimaBomba = { tipo: tipoBomba, uid, casilla: casillaObjetivo, en: Date.now() };
   await rtdb.ref(`partidas/${partidaId}`).update(actualizaciones);
   await registrarProgreso(uid, "bomba_elemental_usada", 1);

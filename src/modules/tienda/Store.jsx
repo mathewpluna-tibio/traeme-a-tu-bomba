@@ -14,7 +14,7 @@ const CATEGORIES = [
   { id: "titulo", label: "Títulos" },
 ];
 
-// Imagen del ítem o emoji de respaldo si no hay imagen / no carga
+// Imagen del ítem (o el nombre si es un título)
 function ItemVisual({ item }) {
   if (item.category === "titulo") {
     return <span className="st-title-chip">{item.name}</span>;
@@ -50,7 +50,7 @@ function ItemCard({ item, onOpen, busy }) {
         ) : item.owned ? (
           <span className="st-owned-pill">Equipar</span>
         ) : (
-          <span className="st-price-pill">{busy ? "Comprando..." : (<><span className="st-coin-dot" />{item.price}</>)}</span>
+          <span className="st-price-pill">{busy ? "Comprando..." : (<><i className="st-coin-dot fa-solid fa-crown" aria-hidden="true" />{item.price}</>)}</span>
         )}
       </div>
     </button>
@@ -107,7 +107,7 @@ function PreviewMockup({ item, avatar, username }) {
  * Este componente no decide por ti: solo pinta lo que traiga `items`.
  * Si quieres ocultarlos, no los incluyas en el arreglo que pasas.
  *
- * 🔧 CÓMO CONECTARLO A TU BACKEND:
+ * CÓMO CONECTARLO A TU BACKEND:
  *
  *   <Store
  *     coins={72}
@@ -176,7 +176,7 @@ export default function Store({
             <p className="st-subtitle">Personaliza tu perfil con marcos, banners y títulos</p>
           </div>
           <div className="st-coins">
-            <span className="st-coin-dot" />
+            <i className="st-coin-dot fa-solid fa-crown" aria-hidden="true" />
             <span className="st-coin-amount">{coins}</span>
           </div>
         </header>

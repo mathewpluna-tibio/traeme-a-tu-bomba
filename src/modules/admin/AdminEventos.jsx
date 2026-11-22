@@ -17,6 +17,27 @@ const eliminarEventoCallable = httpsCallable(functions, "eliminarEvento");
 
 const MAX_MISIONES = 8;
 
+// RQNF-ADM-02B: mismos límites que valida guardarEvento en el servidor.
+const HORA_MS = 60 * 60 * 1000;
+const DIA_MS = 24 * HORA_MS;
+
+function validarFechas(f, inicioOriginal) {
+  if (!f.inicio || !f.fin) return "Indica la fecha y hora de inicio y de fin.";
+  const inicio = new Date(f.inicio).getTime();
+  const fin = new Date(f.fin).getTime();
+  const ahora = Date.now();
+  if (Number.isNaN(inicio) || Number.isNaN(fin)) return "Fechas inválidas.";
+  if (fin <= inicio) return "La fecha de fin debe ser posterior a la de inicio.";
+  if (fin - inicio < HORA_MS) return "El evento debe durar al menos 1 hora.";
+  if (fin - inicio > 30 * DIA_MS) return "El evento puede durar como máximo 30 días.";
+  if (inicio > ahora + 60 * DIA_MS) return "El evento debe empezar dentro de los próximos 60 días.";
+  if (fin <= ahora) return "La fecha de fin ya pasó.";
+  if (f.inicio !== inicioOriginal && inicio < ahora - 5 * 60 * 1000) {
+    return "La fecha de inicio no puede estar en el pasado.";
+  }
+  return "";
+}
+
 const nuevaMision = () => ({ id: null, tipo: "victoria", objetivo: 5, descripcion: "", coronas: 20, cosTipo: "", cosId: "" });
 
 const aInputLocal = (ms) => {
@@ -67,6 +88,8 @@ const ETIQUETA_ESTADO = { programado: "Programado", activo: "Activo", concluido:
 
 function FormularioEvento({ inicial, onCancelar, onGuardado }) {
   const [f, setF] = useState(inicial);
+  // Fecha máxima de inicio (RQNF-ADM-02B), calculada al abrir el formulario.
+  const [maxInicio] = useState(() => aInputLocal(Date.now() + 60 * DIA_MS));
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState("");
 
@@ -77,8 +100,9 @@ function FormularioEvento({ inicial, onCancelar, onGuardado }) {
   const guardar = async (e) => {
     e.preventDefault();
     setError("");
-    if (!f.inicio || !f.fin) {
-      setError("Indica la fecha y hora de inicio y de fin.");
+    const errorFechas = validarFechas(f, inicial.inicio);
+    if (errorFechas) {
+      setError(errorFechas);
       return;
     }
     setGuardando(true);
@@ -108,11 +132,11 @@ function FormularioEvento({ inicial, onCancelar, onGuardado }) {
       <div className="ad-row">
         <label className="ad-field">
           <span>Inicio</span>
-          <input className="ad-input" type="datetime-local" value={f.inicio} onChange={(e) => set("inicio", e.target.value)} required />
+          <input className="ad-input" type="datetime-local" value={f.inicio} max={maxInicio} onChange={(e) => set("inicio", e.target.value)} required />
         </label>
         <label className="ad-field">
           <span>Fin</span>
-          <input className="ad-input" type="datetime-local" value={f.fin} onChange={(e) => set("fin", e.target.value)} required />
+          <input className="ad-input" type="datetime-local" value={f.fin} min={f.inicio || undefined} onChange={(e) => set("fin", e.target.value)} required />
         </label>
       </div>
 

@@ -45,7 +45,9 @@ export default function LogrosPage({ onVolver }) {
                     key={logro.id}
                     className={`logro-card ${desbloqueado ? "logro-desbloqueado" : "logro-bloqueado"}`}
                   >
-                    <div className="logro-icono">{desbloqueado ? "🏆" : "🔒"}</div>
+                    <div className="logro-icono">
+                      <i className={desbloqueado ? "fa-solid fa-key" : "fa-solid fa-lock"} aria-hidden="true" />
+                    </div>
                     <div className="logro-info">
                       <p className="logro-descripcion">{logro.descripcion}</p>
                       <div className="logro-barra-fondo">

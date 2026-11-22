@@ -5,19 +5,6 @@ import { useAuth } from "../../context/AuthContext";
 import UserBomb from "../../assets/UserBomb.png";
 import "./RankingsPage.css";
 
-const ICONO_POR_RANGO = {
-  "Cadetes Bomberos": "",
-  "Entusiastas de las Explosiones": "",
-  "Genios Explosivos": "",
-  "Señor de las Bombas": "",
-};
-
-function medalFor(posicion) {
-  if (posicion === 1) return "1";
-  if (posicion === 2) return "2";
-  if (posicion === 3) return "3";
-  return null;
-}
 
 export default function RankingsPage({ onVolver, onVerPerfil }) {
   const { user } = useAuth();
@@ -94,7 +81,6 @@ export default function RankingsPage({ onVolver, onVerPerfil }) {
 
           <div className="rk-list">
             {jugadores.map((j) => {
-              const medalla = medalFor(j.posicion);
               return (
                 <button
                   key={j.uid}
@@ -106,11 +92,10 @@ export default function RankingsPage({ onVolver, onVerPerfil }) {
                   onClick={() => onVerPerfil(j.uid)}
                 >
                   <span className="rk-col rk-col-pos">
-                    {medalla ? (
-                      <span className="rk-medal">{medalla}</span>
-                    ) : (
-                      <span className="rk-pos-number">{j.posicion}</span>
-                    )}
+                    {/* Top 3: 1.º azul diamante, 2.º dorado, 3.º plateado */}
+                    <span className={"rk-pos-number" + (j.posicion <= 3 ? ` rk-pos-top rk-pos-top--${j.posicion}` : "")}>
+                      {j.posicion}
+                    </span>
                   </span>
 
                   <span className="rk-col rk-col-player">
@@ -120,10 +105,7 @@ export default function RankingsPage({ onVolver, onVerPerfil }) {
                   </span>
 
                   <span className="rk-col rk-col-tier">
-                    <span className="rk-tier-badge">
-                      <span>{ICONO_POR_RANGO[j.rango] || "💥"}</span>
-                      {j.rango}
-                    </span>
+                    <span className="rk-tier-badge">{j.rango}</span>
                   </span>
 
                   <span className="rk-col rk-col-stat">{j.valor}</span>

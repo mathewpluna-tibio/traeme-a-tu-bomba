@@ -29,8 +29,6 @@ export const menuMachine = setup({}).createMachine({
           target: "clase",
           actions: assign({ modalidad: () => "estandar" }),
         },
-        // Lobby privado (RQF-MEN-05): sin clase que elegir, el lobby ya fue
-        // creado por MenuPrincipal y llega su id en el evento.
         SELECCIONAR_MODALIDAD_OTRA: [
           {
             guard: ({ context }) => context.tipoAccion === "lobby",

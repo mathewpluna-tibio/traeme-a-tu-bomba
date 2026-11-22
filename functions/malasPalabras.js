@@ -1,6 +1,6 @@
 
 module.exports = [
-  "puto", "puta", "putito", "putita", "pendejo", "pendeja", "cabron", "cabrona",
+  "puto", "puton", "xxx", "puta", "putito", "putita", "pendejo", "pendeja", "cabron", "cabrona",
   "verga", "chingar", "chingada", "mierda", "culero", "culera",
   "joto", "jotito","marica", "maricon", "pinche", "idiota", "estupido",
   "estupida", "imbecil", "baboso", "babosa", "cagada", "gonorrea",

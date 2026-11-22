@@ -11,7 +11,7 @@ function Recompensa({ recompensa }) {
     <div className="ev-rewards">
       {recompensa?.coronas > 0 && (
         <span className="ev-reward ev-reward--coronas">
-          <span className="ev-coin" />
+          <i className="ev-coin fa-solid fa-crown" aria-hidden="true" />
           {recompensa.coronas} coronas
         </span>
       )}

@@ -1,8 +1,4 @@
-// Animaciones de las bombas en el tablero (RQF-TAB-03 / RQNF-TAB-03: anime.js).
-//
-// Las animaciones que necesitan elementos extra (bomba flotante, destello,
-// partículas) se dibujan en una capa `.gp-fx` que React no administra,
-// colocada encima del tablero. Así no se mezclan con los nodos de React.
+
 import { animate, createTimeline, stagger } from "animejs";
 
 const COLOR_ELEMENTO = {
@@ -111,10 +107,6 @@ export function animarActivacion(celda, capa) {
   });
 }
 
-/**
- * Detonación: la bomba aparece y tiembla (activación), se hincha y explota
- * con destello, partículas y sacudida del tablero.
- */
 export function animarDetonacion(celda, capa, tablero, imagenBomba) {
   if (!celda || !capa) return;
   const r = rectRelativo(celda, capa);
@@ -176,11 +168,6 @@ export function animarMarca(celda) {
   });
 }
 
-/**
- * Bomba elemental: la bomba aparece sobre la casilla objetivo y estalla con
- * el color de su elemento. `extras` son casillas afectadas (cruz de la
- * eléctrica, casillas bloqueadas por lianas) que destellan en cadena.
- */
 export function animarBombaElemental(tipo, celda, capa, imagenBomba, extras = []) {
   if (!celda || !capa) return;
   const color = COLOR_ELEMENTO[tipo] || "#ffd166";
@@ -224,11 +211,6 @@ export function animarBombaElemental(tipo, celda, capa, imagenBomba, extras = []
     });
 }
 
-/**
- * Ocultamiento: pasados 3 segundos la bomba se esconde. Se dibuja una copia
- * de la bomba que se encoge girando y se desvanece con un poco de polvo, y
- * la casilla da un pequeño pulso.
- */
 export function animarOcultar(celda, capa, imagenBomba) {
   if (!celda || !capa) return;
   const r = rectRelativo(celda, capa);

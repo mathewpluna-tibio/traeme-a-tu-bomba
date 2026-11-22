@@ -1,9 +1,9 @@
-// Configuración de dimensiones por tipo de tablero y ronda
+
 const CONFIG_TABLEROS = {
   cuadrado: {
     1: { filas: 5, columnas: 5 },
     2: { filas: 6, columnas: 6 },
-    default: { filas: 7, columnas: 7 }, // ronda 3+
+    default: { filas: 7, columnas: 7 }, 
   },
   rectangulo: {
     1: { filas: 4, columnas: 7 },

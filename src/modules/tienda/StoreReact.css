@@ -555,4 +555,5 @@
 .st-page .st-preview-banner { background-repeat: no-repeat; background-position: center; background-size: cover; }
 /* La etiqueta de rareza va por encima del recuadro de la imagen */
 .st-page .st-rarity-tag { z-index: 3; }
-.st-coin-dot { display:inline-block; width:12px; height:12px; border-radius:50%; background: radial-gradient(circle at 35% 30%, #fff3c4, #ffd166 55%, #d9941a); box-shadow: 0 0 0 1px rgba(0,0,0,.25) inset; margin-right:6px; vertical-align:middle; flex:none; }
+/* Corona (moneda del juego) */
+.st-coin-dot { color: #ffd166; font-size: 12px; margin-right: 6px; vertical-align: middle; flex: none; }

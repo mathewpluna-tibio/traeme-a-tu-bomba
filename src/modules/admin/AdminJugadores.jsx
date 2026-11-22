@@ -4,11 +4,8 @@ import { httpsCallable } from "firebase/functions";
 import { db, functions } from "../../firebase/config";
 
 const banearCallable = httpsCallable(functions, "banearUsuario");
-const renombrarCallable = httpsCallable(functions, "forzarCambioNombre");
 
 function Fila({ jugador, onCambio }) {
-  const [renombrando, setRenombrando] = useState(false);
-  const [nombre, setNombre] = useState(jugador.username || "");
   const [ocupado, setOcupado] = useState(false);
   const [error, setError] = useState("");
 
@@ -38,15 +35,6 @@ function Fila({ jugador, onCambio }) {
     });
   };
 
-  const guardarNombre = (e) => {
-    e.preventDefault();
-    ejecutar(async () => {
-      await renombrarCallable({ uid: jugador.id, username: nombre });
-      onCambio({ ...jugador, username: nombre.trim() });
-      setRenombrando(false);
-    });
-  };
-
   return (
     <article className="ad-card ad-jugador">
       <div className="ad-card-top">
@@ -60,9 +48,6 @@ function Fila({ jugador, onCambio }) {
           <code className="ad-uid">{jugador.id}</code>
         </div>
         <div className="ad-actions">
-          <button type="button" className="ad-btn ad-btn--ghost ad-btn--sm" disabled={ocupado} onClick={() => setRenombrando((v) => !v)}>
-            Cambiar nombre
-          </button>
           <button
             type="button"
             className={"ad-btn ad-btn--sm " + (jugador.baneado ? "ad-btn--primary" : "ad-btn--danger")}
@@ -74,12 +59,6 @@ function Fila({ jugador, onCambio }) {
         </div>
       </div>
 
-      {renombrando && (
-        <form className="ad-row ad-rename" onSubmit={guardarNombre}>
-          <input className="ad-input" value={nombre} minLength={3} maxLength={20} onChange={(e) => setNombre(e.target.value)} required />
-          <button type="submit" className="ad-btn ad-btn--primary ad-btn--sm" disabled={ocupado}>Guardar</button>
-        </form>
-      )}
       {jugador.baneado && jugador.motivoBaneo && <p className="ad-muted">Motivo: {jugador.motivoBaneo}</p>}
       {error && <p className="ad-error">{error}</p>}
     </article>

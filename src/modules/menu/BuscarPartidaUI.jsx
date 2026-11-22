@@ -1,10 +1,10 @@
 import { useState } from "react";
 import "./BuscarPartida.css";
 
-// Muestra la imagen de la bomba; si no hay o falla, usa el emoji de respaldo.
+// Muestra la imagen de la bomba; si no hay o falla, muestra su nombre.
 export function VisualBomba({ item }) {
   const [fallo, setFallo] = useState(false);
-  if (!item.imagen || fallo) return <span className="sm-card-emoji">{item.emoji}</span>;
+  if (!item.imagen || fallo) return <span className="sm-card-emoji">{item.nombre}</span>;
   return <img src={item.imagen} alt={item.nombre} onError={() => setFallo(true)} />;
 }
 
@@ -33,10 +33,6 @@ const PASOS = [
   { key: "busqueda", label: "Búsqueda", n: 3 },
 ];
 
-/**
- * Marco común del flujo Modalidad → Clase → Búsqueda (RQNF-MEN-02).
- * paso: "modo" | "clase" | "busqueda"
- */
 export function PanelBuscar({ titulo, paso, conClase, onAtras, children, pie }) {
   const orden = PASOS.map((p) => p.key);
   return (

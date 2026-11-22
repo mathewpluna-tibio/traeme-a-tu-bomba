@@ -100,7 +100,7 @@ function PreviewMockup({ item, avatar, username }) {
  *  - RQF-PERS-02: filtrar por categoría (Marcos, Banners, Títulos).
  *  - RQF-PERS-03 / RQNF-PERS-03: vista previa antes de confirmar el equipado.
  *
- * 🔧 CÓMO CONECTARLO A TU BACKEND:
+ * CÓMO CONECTARLO A TU BACKEND:
  *
  *   <Inventory
  *     items={[

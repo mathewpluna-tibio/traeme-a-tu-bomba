@@ -37,14 +37,29 @@ import "./GameMenu.css";
 const crearLobbyCallable = httpsCallable(functions, "crearLobby");
 
 const NAV_ITEMS = [
-  { id: "buscar", label: "Jugar", icon: "🎮" },
-  { id: "tienda", label: "Tienda", icon: "🛒" },
-  { id: "inventario", label: "Inventario", icon: "📦" },
-  { id: "amigos", label: "Amigos", icon: "👥" },
-  { id: "ranking", label: "Ranking", icon: "🏆" },
-  { id: "logros", label: "Logros", icon: "🎖️" },
-  { id: "evento", label: "Evento", icon: "📅" },
+  { id: "buscar", label: "Jugar", icon: null },
+  { id: "tienda", label: "Tienda", icon: "fa-solid fa-cart-shopping" },
+  { id: "inventario", label: "Inventario", icon: "fa-solid fa-boxes-stacked" },
+  { id: "amigos", label: "Amigos", icon: "fa-solid fa-user-group" },
+  { id: "ranking", label: "Ranking", icon: "fa-solid fa-ranking-star" },
+  { id: "logros", label: "Logros", icon: "fa-solid fa-award" },
+  { id: "evento", label: "Evento", icon: "fa-regular fa-calendar" },
 ];
+
+// Tiempo que falta para la renovación de misiones diarias (00:00, hora de México).
+function tiempoHastaRenovacion(ahoraMs) {
+  const partes = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Mexico_City",
+    hour: "numeric",
+    minute: "numeric",
+    hourCycle: "h23",
+  }).formatToParts(new Date(ahoraMs));
+  const valor = (tipo) => Number(partes.find((p) => p.type === tipo)?.value || 0);
+  const minutosRestantes = 24 * 60 - (valor("hour") * 60 + valor("minute"));
+  const h = Math.floor(minutosRestantes / 60);
+  const m = minutosRestantes % 60;
+  return h > 0 ? `${h} h ${m} min` : `${m} min`;
+}
 
 export default function MenuPrincipal() {
   const { user, cerrarSesion } = useAuth();
@@ -249,7 +264,7 @@ export default function MenuPrincipal() {
   // --- Pantalla principal (diseño de GameMenu fusionado) ---
   const misiones = (profile?.misionesDiarias?.lista || []).map((m, index) => ({
     id: m.id || index,
-    icon: m.completada ? "✅" : "🎯",
+    completada: m.completada === true,
     title: m.descripcion,
     progress: `${m.progreso}/${m.objetivo}`,
   }));
@@ -269,7 +284,7 @@ export default function MenuPrincipal() {
             }
             onClick={() => manejarNav(item.id)}
           >
-            <span className="gm-nav-icon">{item.icon}</span>
+            {item.icon && <i className={`gm-nav-icon ${item.icon}`} aria-hidden="true" />}
             <span>{item.label}</span>
             {item.id === "amigos" && solicitudes.length > 0 && (
               <span className="gm-nav-badge">{solicitudes.length}</span>
@@ -285,14 +300,14 @@ export default function MenuPrincipal() {
             aria-label="Configuración" 
             title="Configuracion del juego"
             onClick={()=> { setNavActivo(null); setPantallaActiva("configuracion");}}
-          >⚙️</button>
+          ><i className="fa-solid fa-gear" aria-hidden="true" /></button>
 
           <button
             className="gm-icon-btn"
             aria-label="Guía del juego"
             title="Guía del juego"
             onClick={() => { setNavActivo(null); setPantallaActiva("guia"); }}
-          >❓</button>
+          ><i className="fa-regular fa-circle-question" aria-hidden="true" /></button>
         </div>
 
         <div
@@ -323,11 +338,9 @@ export default function MenuPrincipal() {
 
           <div className="gm-action-buttons">
             <button className="gm-btn gm-btn--primary" onClick={() => iniciarFlujo("buscar")}>
-              <span className="gm-btn-icon">⚔️</span>
               Buscar partida
             </button>
             <button className="gm-btn gm-btn--secondary" onClick={() => iniciarFlujo("lobby")}>
-              <span className="gm-btn-icon">🔒</span>
               Lobby privado
             </button>
           </div>
@@ -412,20 +425,22 @@ export default function MenuPrincipal() {
       <section className="gm-panel">
         <header className="gm-panel-header">
           <h2 className="gm-panel-title">
-            <span className="gm-panel-icon">🎯</span>
+            <i className="gm-panel-icon fa-solid fa-bullseye" aria-hidden="true" />
             Misiones diarias
           </h2>
-          <span className="gm-panel-timer">🕐 --</span>
+          <span className="gm-panel-timer" title="Tiempo para la renovación de misiones">
+            Se renuevan en {tiempoHastaRenovacion(ahoraEvento)}
+          </span>
         </header>
 
         <ul className="gm-mission-list">
           {misiones.length === 0 && <li className="gm-mission">Sin misiones disponibles aún.</li>}
           {misiones.map((mission) => (
-            <li className="gm-mission" key={mission.id}>
-              <span className="gm-mission-icon">{mission.icon}</span>
+            <li className={"gm-mission" + (mission.completada ? " gm-mission--done" : "")} key={mission.id}>
+              <i className="gm-mission-icon fa-solid fa-bullseye" aria-hidden="true" />
               <div className="gm-mission-info">
                 <span className="gm-mission-title">{mission.title}</span>
-                <span className="gm-mission-subtitle">Misión Diaria</span>
+                <span className="gm-mission-subtitle">{mission.completada ? "Completada" : "Misión diaria"}</span>
               </div>
               <span className="gm-mission-progress">{mission.progress}</span>
             </li>
@@ -436,7 +451,7 @@ export default function MenuPrincipal() {
       <section className="gm-panel">
         <header className="gm-panel-header">
           <h2 className="gm-panel-title">
-            <span className="gm-panel-icon">📅</span>
+            <i className="gm-panel-icon fa-regular fa-calendar" aria-hidden="true" />
             Evento especial
           </h2>
         </header>
@@ -453,7 +468,7 @@ export default function MenuPrincipal() {
           </button>
         ) : (
           <div className="gm-empty-event">
-            <span className="gm-empty-event-icon">🗓️</span>
+            <i className="gm-empty-event-icon fa-regular fa-calendar" aria-hidden="true" />
             <p className="gm-empty-event-title">No existe un evento activo</p>
             <p className="gm-empty-event-text">
               No existe un evento en este momento.

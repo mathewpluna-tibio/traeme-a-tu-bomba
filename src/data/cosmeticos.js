@@ -53,10 +53,6 @@ export function marcoDeRango(profile) {
   return MARCOS_RANGO[rango] || MARCOS_RANGO["Cadetes Bomberos"];
 }
 
-/**
- * Marco que se dibuja en el perfil y en la partida: el comprado que tenga
- * equipado o, si tiene el base (o un id antiguo), el de su rango.
- */
 export function marcoDelPerfil(profile) {
   const id = profile?.marcoActivo;
   if (id && MARCOS[id] && id !== "Default") return MARCOS[id];

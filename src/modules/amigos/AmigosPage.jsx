@@ -36,14 +36,14 @@ function FilaJugador({ jugador, esAmigo, enviada, esInvitado, onVerPerfil, onRet
           title={!enLinea ? "El jugador debe estar en línea para retarlo" : undefined}
           onClick={() => onRetar(jugador.uid)}
         >
-          ⚔️ Retar
+          Retar
         </button>
         {esAmigo ? (
           <button className="amg-btn" onClick={() => onEliminar(jugador.uid)}>Eliminar</button>
         ) : (
           !esInvitado && (
             <button className="amg-btn" disabled={enviada} onClick={() => onAgregar(jugador.uid)}>
-              {enviada ? "Solicitud enviada ✓" : "➕ Agregar"}
+              {enviada ? "Solicitud enviada ✓" : "Agregar"}
             </button>
           )
         )}

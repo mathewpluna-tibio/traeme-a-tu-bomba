@@ -103,8 +103,7 @@ export default function PartidaScreen({
           onRevancha={onRevancha}
         />
       )}
-      {/* Al terminar la partida sí se pueden recibir retos (p. ej. la revancha
-          del rival); durante la partida no, para no interrumpirla. */}
+     
       {partida.estado === "finalizada" && onAceptarReto && (
         <>
           <InvitacionesRetos onAceptar={onAceptarReto} />
