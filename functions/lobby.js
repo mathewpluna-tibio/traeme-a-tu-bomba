@@ -11,7 +11,6 @@ const {
 
 const MODALIDADES = ["estandar", "venenosas", "elementales"];
 const CLASES = ["minibomba", "bomba", "bombota", "aleatoria"];
-const DURACION_TURNO_ELEMENTAL_MS = 7000;
 // RQF-AMI-02B: tiempo que tiene el jugador retado para responder.
 const DURACION_RETO_MS = 60 * 1000;
 // Margen para diferencias de reloj entre el navegador y el servidor.
@@ -150,8 +149,6 @@ const crearLobby = onCall(async (request) => {
   return { lobbyId, expiraEn: lobby.expiraEn || null };
 });
 
-// RQNF-AMI-02: lo llaman el retador o el retado cuando su contador llega a
-// cero. El servidor confirma con su propio reloj que el reto ya venció.
 const expirarReto = onCall(async (request) => {
   const uid = request.auth?.uid;
   if (!uid) {
@@ -256,11 +253,6 @@ const unirseALobby = onCall(async (request) => {
   const claseInvitado = validarModalidadYClase(lobby.modalidad, clase);
 
   // Solo uno gana la carrera por entrar: esperando -> iniciada, una vez.
-  // OJO: las transacciones de RTDB llaman primero a la función con el valor
-  // en caché, que suele ser null; si en ese caso devolviéramos undefined la
-  // transacción se ABORTA sin reintentar (y todos los enlaces saldrían como
-  // "no válidos"). Devolver el mismo null hace que Firebase la reintente con
-  // el valor real del servidor.
   const reserva = await lobbyRef.transaction((actual) => {
     if (actual === null) return actual;
     if (actual.estado !== "esperando") return undefined;
@@ -311,11 +303,11 @@ const unirseALobby = onCall(async (request) => {
         [uidAzul]: jugadorElemental("azul", invitadoPorUid[uidAzul]),
         [uidRojo]: jugadorElemental("rojo", invitadoPorUid[uidRojo]),
       },
-      turnoActual: {
-        uidActivo: uidAzul,
-        inicioEn: ahora,
-        finalizaEn: ahora + DURACION_TURNO_ELEMENTAL_MS,
-      },
+      // El reloj del primer turno arranca cuando los dos entran
+      // (confirmarEntradaPartida en index.js).
+      turnoActual: { uidActivo: uidAzul },
+      esperandoJugadores: true,
+      esperandoDesde: ahora,
       creadaEn: ahora,
     };
   } else {

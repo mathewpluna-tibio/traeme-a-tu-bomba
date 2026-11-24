@@ -32,7 +32,9 @@ export default function FasePreparacion({ partidaId, partida, perfiles = {} }) {
   const miInfo = partida.jugadores?.[user.uid];
   const rivalInfo = partida.jugadores?.[rivalUid];
   const bombasRestantes = miInfo?.bombasDisponibles ?? 0;
-  const esMiTurno = partida.turnoColocacion?.uidActivo === user.uid;
+  // Mientras el rival no entra a la partida nadie coloca y no corre el tiempo.
+  const esperandoRival = partida.esperandoJugadores === true;
+  const esMiTurno = !esperandoRival && partida.turnoColocacion?.uidActivo === user.uid;
   const finalizaEn = partida.turnoColocacion?.finalizaEn;
   const tipoBomba = partida.modalidad === "venenosas" ? "veneno" : miInfo?.clase || "bomba";
 
@@ -97,11 +99,13 @@ export default function FasePreparacion({ partidaId, partida, perfiles = {} }) {
           enTurno: esMiTurno,
           extra: <ExtraBombas tipo={tipoBomba} cantidad={bombasRestantes} />,
         }}
-        rival={{ perfil: perfiles[rivalUid], vidas: rivalInfo?.vidas, enTurno: !esMiTurno }}
+        rival={{ perfil: perfiles[rivalUid], vidas: rivalInfo?.vidas, enTurno: !esMiTurno && !esperandoRival }}
       />
 
       <div className={"gp-status" + (esMiTurno ? " gp-status--activo" : "")}>
-        {esMiTurno
+        {esperandoRival
+          ? "Esperando a que tu rival entre a la partida..."
+          : esMiTurno
           ? bombasRestantes > 0
             ? "Tu turno: coloca tus bombas en el tablero"
             : "Listo, esperando..."

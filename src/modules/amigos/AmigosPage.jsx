@@ -12,8 +12,13 @@ const enviarSolicitudCallable = httpsCallable(functions, "enviarSolicitudAmistad
 const responderSolicitudCallable = httpsCallable(functions, "responderSolicitudAmistad");
 const eliminarAmigoCallable = httpsCallable(functions, "eliminarAmigo");
 
+/** "k7qm4xpr" o "K7QM 4XPR" -> "K7QM-4XPR"; null si no tiene forma de ID de amigo. */
+function normalizarIdAmigo(texto) {
+  const limpio = texto.toUpperCase().replace(/[^A-Z0-9]/g, "");
+  return limpio.length === 8 ? `${limpio.slice(0, 4)}-${limpio.slice(4)}` : null;
+}
+
 function FilaJugador({ jugador, esAmigo, enviada, esInvitado, onVerPerfil, onRetar, onAgregar, onEliminar }) {
-  // RQNF-SOC-03: el estado en línea viene de Realtime Database en tiempo real
   const enLinea = useEstaEnLinea(jugador.uid);
 
   return (
@@ -42,7 +47,12 @@ function FilaJugador({ jugador, esAmigo, enviada, esInvitado, onVerPerfil, onRet
           <button className="amg-btn" onClick={() => onEliminar(jugador.uid)}>Eliminar</button>
         ) : (
           !esInvitado && (
-            <button className="amg-btn" disabled={enviada} onClick={() => onAgregar(jugador.uid)}>
+            <button
+              className="amg-btn"
+              disabled={enviada || !jugador.idAmigo}
+              title={!jugador.idAmigo ? "Este jugador todavía no tiene ID de amigo" : undefined}
+              onClick={() => onAgregar(jugador)}
+            >
               {enviada ? "Solicitud enviada ✓" : "Agregar"}
             </button>
           )
@@ -88,8 +98,6 @@ export default function AmigosPage({ onVolver, onVerPerfil, onRetar, solicitudes
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [amigosUids]);
 
-  // RQF-SOC-01: búsqueda por nombre de usuario (prefijo, consulta indexada
-  // sobre `username`) o por ID único (uid exacto).
   useEffect(() => {
     const termino = busqueda.trim();
     if (!termino) {
@@ -114,9 +122,12 @@ export default function AmigosPage({ onVolver, onVerPerfil, onRetar, solicitudes
         );
         porNombre.forEach((d) => encontrados.set(d.id, { uid: d.id, ...d.data() }));
 
-        if (!termino.includes("/") && termino.length >= 20) {
-          const porId = await getDoc(doc(db, "usuarios", termino));
-          if (porId.exists()) encontrados.set(porId.id, { uid: porId.id, ...porId.data() });
+        const idAmigo = normalizarIdAmigo(termino);
+        if (idAmigo) {
+          const porId = await getDocs(
+            query(collection(db, "usuarios"), where("idAmigo", "==", idAmigo), limit(1))
+          );
+          porId.forEach((d) => encontrados.set(d.id, { uid: d.id, ...d.data() }));
         }
 
         if (!cancelado) {
@@ -138,11 +149,11 @@ export default function AmigosPage({ onVolver, onVerPerfil, onRetar, solicitudes
     };
   }, [busqueda, user?.uid]);
 
-  const agregar = async (uidDestino) => {
+  const agregar = async (jugador) => {
     setMensaje("");
     try {
-      await enviarSolicitudCallable({ uidDestino });
-      setEnviadas((prev) => ({ ...prev, [uidDestino]: true }));
+      await enviarSolicitudCallable({ idAmigo: jugador.idAmigo });
+      setEnviadas((prev) => ({ ...prev, [jugador.uid]: true }));
     } catch (err) {
       console.error("Error al enviar solicitud:", err);
       setMensaje(err.message || "No se pudo enviar la solicitud.");
@@ -176,8 +187,9 @@ export default function AmigosPage({ onVolver, onVerPerfil, onRetar, solicitudes
   let lista = amigosCargados;
   if (resultados !== null) {
     const t = busqueda.trim().toLowerCase();
+    const idBuscado = normalizarIdAmigo(busqueda.trim());
     const amigosQueCoinciden = amigosCargados.filter(
-      (a) => a.username?.toLowerCase().includes(t) || a.uid === busqueda.trim()
+      (a) => a.username?.toLowerCase().includes(t) || (idBuscado && a.idAmigo === idBuscado)
     );
     const idsAmigosCoinciden = new Set(amigosQueCoinciden.map((a) => a.uid));
     const otros = resultados.filter((j) => !idsAmigosCoinciden.has(j.uid));
@@ -223,7 +235,7 @@ export default function AmigosPage({ onVolver, onVerPerfil, onRetar, solicitudes
       <input
         className="amg-busqueda"
         type="search"
-        placeholder="Buscar jugador por nombre de usuario o ID..."
+        placeholder="Buscar jugador por nombre de usuario o ID de amigo..."
         value={busqueda}
         onChange={(e) => setBusqueda(e.target.value)}
       />
@@ -238,7 +250,7 @@ export default function AmigosPage({ onVolver, onVerPerfil, onRetar, solicitudes
           <p className="amg-vacio">
             {resultados !== null
               ? "No se encontró ningún jugador."
-              : "Aún no tienes amigos. ¡Busca a alguien por su nombre o ID!"}
+              : "Aún no tienes amigos. ¡Busca a alguien por su nombre o ID de amigo!"}
           </p>
         )}
 

@@ -7,7 +7,8 @@ service cloud.firestore {
     // modificarlos después desde el navegador.
     function camposProtegidos() {
       return ['estadisticas', 'progresoEventos', 'baneado', 'motivoBaneo',
-              'coronas', 'marcosComprados', 'bannersComprados', 'titulosObtenidos'];
+              'coronas', 'marcosComprados', 'bannersComprados', 'titulosObtenidos',
+              'idAmigo'];
     }
 
     match /usuarios/{uid} {
@@ -23,7 +24,8 @@ service cloud.firestore {
         && !('marcosComprados' in request.resource.data)
         && !('bannersComprados' in request.resource.data)
         && !('titulosObtenidos' in request.resource.data)
-        && !('progresoEventos' in request.resource.data);
+        && !('progresoEventos' in request.resource.data)
+        && !('idAmigo' in request.resource.data);
 
       // Después solo puede cambiar sus datos personales y cosméticos
       // equipados; los campos protegidos quedan bloqueados.
@@ -47,6 +49,12 @@ service cloud.firestore {
       allow read: if request.auth != null
         && (resource.data.de == request.auth.uid || resource.data.para == request.auth.uid);
       allow write: if false;
+    }
+
+    // ID de amigo -> uid. Solo lo usan las Cloud Functions, así el uid
+    // interno nunca se pide ni se muestra para agregar amigos.
+    match /idsAmigo/{id} {
+      allow read, write: if false;
     }
 
     match /guias/{id} {

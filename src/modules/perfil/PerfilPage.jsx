@@ -9,6 +9,7 @@ import ProfileHeader from "./ProfileHeader";
 import StatsPanel from "./StatsPanel";
 
 const enviarSolicitudCallable = httpsCallable(functions, "enviarSolicitudAmistad");
+const obtenerIdAmigoCallable = httpsCallable(functions, "obtenerIdAmigo");
 
 const MODALIDADES = [
   { key: "general", label: "Vista General" },
@@ -51,10 +52,17 @@ export default function PerfilPage({ onVolver, uidObjetivo, onRetar }) {
     };
   }, [user, isOwnProfile, targetUid]);
 
-  const agregarAmigo = async (uidDestino) => {
+  // Cuentas creadas antes del ID de amigo: se genera al abrir el propio perfil.
+  const faltaIdAmigo = isOwnProfile && !!profile && !profile.idAmigo && !user?.isAnonymous;
+  useEffect(() => {
+    if (!faltaIdAmigo) return;
+    obtenerIdAmigoCallable().catch((err) => console.error("Error al obtener el ID de amigo:", err));
+  }, [faltaIdAmigo]);
+
+  const agregarAmigo = async (idAmigo) => {
     setMensaje("");
     try {
-      await enviarSolicitudCallable({ uidDestino });
+      await enviarSolicitudCallable({ idAmigo });
     } catch (err) {
       console.error("Error al enviar solicitud:", err);
       setMensaje(err.message || "No se pudo enviar la solicitud.");

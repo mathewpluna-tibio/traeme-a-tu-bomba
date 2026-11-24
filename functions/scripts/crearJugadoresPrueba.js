@@ -1,4 +1,3 @@
-
 const fs = require("fs");
 const path = require("path");
 const { initializeApp, cert, applicationDefault } = require("firebase-admin/app");
@@ -209,6 +208,8 @@ async function borrar() {
   for (const d of snap.docs) {
     const amigos = await d.ref.collection("amigos").get();
     await Promise.all(amigos.docs.map((a) => a.ref.delete()));
+    const idAmigo = d.data().idAmigo;
+    if (idAmigo) await firestore.collection("idsAmigo").doc(idAmigo).delete();
     await d.ref.delete();
     await firestore.collection("preferencias").doc(d.id).delete();
   }

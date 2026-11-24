@@ -165,6 +165,8 @@ exports.obtenerCatalogoTienda = require("./tienda").obtenerCatalogoTienda;
 exports.enviarSolicitudAmistad = require("./social").enviarSolicitudAmistad;
 exports.responderSolicitudAmistad = require("./social").responderSolicitudAmistad;
 exports.eliminarAmigo = require("./social").eliminarAmigo;
+exports.obtenerIdAmigo = require("./social").obtenerIdAmigo;
+exports.asignarIdAmigoNuevoUsuario = require("./social").asignarIdAmigoNuevoUsuario;
 exports.crearLobby = require("./lobby").crearLobby;
 exports.cancelarLobby = require("./lobby").cancelarLobby;
 exports.rechazarReto = require("./lobby").rechazarReto;
@@ -378,11 +380,11 @@ const candidatosValidos = candidatos.filter((c) => {
             congeladoPorTurnos: 0,
           },
         },
-        turnoActual: {
-          uidActivo: uidAzul,
-          inicioEn: ahora,
-          finalizaEn: ahora + DURACION_TURNO_ELEMENTAL_MS,
-        },
+        // El reloj del primer turno arranca cuando los dos entran
+        // (confirmarEntradaPartida).
+        turnoActual: { uidActivo: uidAzul },
+        esperandoJugadores: true,
+        esperandoDesde: ahora,
         creadaEn: ahora,
       };
     } else {
@@ -427,6 +429,84 @@ const candidatosValidos = candidatos.filter((c) => {
   }
 }
 
+// ---------------------------------------------------------------------------
+// TRANSACCIONES DE PARTIDA
+// Todas las jugadas de Estándar y Venenosas modifican la partida dentro de una
+// transacción: si dos llamadas llegan a la vez (un clic justo cuando se acaba
+// el turno, los dos clientes pidiendo el timeout, una conexión lenta que
+// reintenta...), solo una se aplica y la otra ve el estado ya actualizado.
+// Antes, una jugada "vieja" podía escribirse encima de la ronda siguiente y
+// dejar la partida rota (casilla segura en el tablero nuevo, ronda saltada...).
+// ---------------------------------------------------------------------------
+
+const DURACION_TURNO_COLOCACION_MS = 30000;
+// Margen para jugadas hechas a tiempo que tardan en llegar al servidor.
+const GRACIA_TURNO_MS = 800;
+// Si un jugador no entra a la partida en este tiempo, la partida empieza igual.
+const ESPERA_MAXIMA_JUGADORES_MS = 20000;
+const TIEMPO_VISIBLE_BOMBA_MS = 3000;
+
+/**
+ * Ejecuta `fn(partida)` dentro de una transacción sobre partidas/{id}.
+ * `fn` modifica la partida recibida y devuelve `info` (cualquier valor que no
+ * sea undefined) para guardar los cambios, o undefined para no escribir nada.
+ * Si `fn` lanza un HttpsError, la transacción se cancela y el error se relanza.
+ */
+async function transaccionPartida(partidaId, fn) {
+  let rechazo = null;
+  let info;
+  const resultado = await rtdb.ref(`partidas/${partidaId}`).transaction(
+    (actual) => {
+      rechazo = null;
+      info = undefined;
+      // Primera llamada con la caché vacía: devolver null hace que Firebase
+      // reintente con el valor real del servidor.
+      if (actual === null) return null;
+      try {
+        info = fn(actual);
+      } catch (err) {
+        if (err instanceof HttpsError) {
+          rechazo = err;
+          return undefined;
+        }
+        throw err;
+      }
+      return info === undefined ? undefined : actual;
+    },
+    undefined,
+    false
+  );
+  if (rechazo) throw rechazo;
+  if (!resultado.snapshot.exists()) {
+    throw new HttpsError("not-found", "La partida no existe.");
+  }
+  return {
+    aplicado: resultado.committed && info !== undefined,
+    info,
+    partida: resultado.snapshot.val(),
+  };
+}
+
+function nuevoTurno(uidActivo, duracionMs) {
+  const ahora = Date.now();
+  return { uidActivo, inicioEn: ahora, finalizaEn: ahora + duracionMs };
+}
+
+// Arranca el reloj del primer turno cuando ya están los dos jugadores.
+function arrancarPrimerTurno(partida) {
+  delete partida.esperandoJugadores;
+  delete partida.esperandoDesde;
+  if (partida.modalidad === "elementales") {
+    partida.turnoActual = nuevoTurno(partida.turnoActual?.uidActivo, DURACION_TURNO_ELEMENTAL_MS);
+  } else if (partida.estado === "preparacion") {
+    partida.turnoColocacion = nuevoTurno(partida.turnoColocacion?.uidActivo, DURACION_TURNO_COLOCACION_MS);
+  }
+}
+
+function todosEnPartida(partida) {
+  return Object.values(partida.jugadores || {}).every((j) => j.listo === true);
+}
+
 exports.onPartidaCreada = onValueWritten(
   "/partidas/{partidaId}/estado",
   async (event) => {
@@ -441,35 +521,73 @@ exports.onPartidaCreada = onValueWritten(
 
     const tipoTablero = elegirTableroAleatorio();
     const casillasIniciales = generarCasillas(tipoTablero, 1);
-
-    const partidaSnap = await rtdb.ref(`partidas/${partidaId}/jugadores`).once("value");
-    const jugadores = partidaSnap.val();
-    const uids = Object.keys(jugadores);
-
     const indiceAzul = Math.floor(Math.random() * 2);
-    const uidAzul = uids[indiceAzul];
-    const uidRojo = uids[1 - indiceAzul];
 
-    const DURACION_TURNO_MS = 30000;
+    // Transacción: si el trigger se ejecuta dos veces, la segunda no hace nada.
+    const { aplicado, partida } = await transaccionPartida(partidaId, (p) => {
+      if (p.estado !== "generando_tablero") return undefined;
+      const uids = Object.keys(p.jugadores || {});
+      const uidAzul = uids[indiceAzul];
+      const uidRojo = uids[1 - indiceAzul];
 
-    await rtdb.ref(`partidas/${partidaId}`).update({
-      tablero: tipoTablero,
-      casillas: casillasIniciales,
-      estado: "preparacion",
-      [`jugadores/${uidAzul}/color`]: "azul",
-      [`jugadores/${uidRojo}/color`]: "rojo",
-      turnoColocacion: {
-        uidActivo: uidAzul,
-        inicioEn: Date.now(),
-        finalizaEn: Date.now() + DURACION_TURNO_MS,
-      },
+      p.tablero = tipoTablero;
+      p.casillas = casillasIniciales;
+      p.estado = "preparacion";
+      p.jugadores[uidAzul].color = "azul";
+      p.jugadores[uidRojo].color = "rojo";
+      p.turnoColocacion = { uidActivo: uidAzul };
+
+      // El tiempo de colocación empieza cuando los dos ya están en la partida.
+      if (todosEnPartida(p)) {
+        arrancarPrimerTurno(p);
+      } else {
+        p.esperandoJugadores = true;
+        p.esperandoDesde = Date.now();
+      }
+      return true;
     });
 
-    console.log(`[Tablero] Completado para partida ${partidaId}, tipo: ${tipoTablero}, inicia: ${uidAzul}`);
-
+    if (aplicado) {
+      console.log(
+        `[Tablero] Completado para partida ${partidaId}, tipo: ${tipoTablero}, inicia: ${partida.turnoColocacion?.uidActivo}` +
+          (partida.esperandoJugadores ? " (esperando a que entren los dos jugadores)" : "")
+      );
+    }
     return null;
   }
 );
+
+// Cada cliente la llama al abrir la partida (y cada pocos segundos mientras
+// se espera al rival). Cuando los dos están dentro, empieza el primer turno.
+exports.confirmarEntradaPartida = onCall(async (request) => {
+  const uid = request.auth?.uid;
+  if (!uid) throw new HttpsError("unauthenticated", "Debes iniciar sesión.");
+  const { partidaId } = request.data || {};
+  if (!partidaId || typeof partidaId !== "string") {
+    throw new HttpsError("invalid-argument", "Falta el ID de partida.");
+  }
+
+  const { aplicado, partida } = await transaccionPartida(partidaId, (p) => {
+    if (!p.jugadores?.[uid]) {
+      throw new HttpsError("permission-denied", "No perteneces a esta partida.");
+    }
+    let cambio = false;
+    if (p.jugadores[uid].listo !== true) {
+      p.jugadores[uid].listo = true;
+      cambio = true;
+    }
+    if (p.esperandoJugadores) {
+      const esperaVencida = Date.now() - (p.esperandoDesde || 0) >= ESPERA_MAXIMA_JUGADORES_MS;
+      if (todosEnPartida(p) || esperaVencida) {
+        arrancarPrimerTurno(p);
+        cambio = true;
+      }
+    }
+    return cambio ? true : undefined;
+  });
+
+  return { aplicado, esperando: partida.esperandoJugadores === true };
+});
 
 exports.testCasillas = onRequest(async (req, res) => {
   const resultados = {};
@@ -514,59 +632,52 @@ exports.colocarBomba = onCall(async (request) => {
     throw new HttpsError("invalid-argument", "Faltan datos de la partida o casilla.");
   }
 
-  const partidaSnap = await rtdb.ref(`partidas/${partidaId}`).once("value");
-  const partida = partidaSnap.val();
+  const { info } = await transaccionPartida(partidaId, (partida) => {
+    if (partida.estado !== "preparacion") {
+      throw new HttpsError("failed-precondition", "No estás en fase de preparación.");
+    }
+    if (partida.esperandoJugadores) {
+      throw new HttpsError("failed-precondition", "Esperando a que tu rival entre a la partida.");
+    }
+    if (partida.turnoColocacion?.uidActivo !== uid) {
+      throw new HttpsError("failed-precondition", "No es tu turno de colocar bombas.");
+    }
+    const finalizaEn = partida.turnoColocacion?.finalizaEn;
+    if (finalizaEn && Date.now() > finalizaEn + GRACIA_TURNO_MS) {
+      throw new HttpsError("failed-precondition", "Se acabó tu tiempo de colocación.");
+    }
+    const jugador = partida.jugadores?.[uid];
+    if (!jugador) {
+      throw new HttpsError("permission-denied", "No perteneces a esta partida.");
+    }
+    if ((jugador.bombasDisponibles || 0) <= 0) {
+      throw new HttpsError("failed-precondition", "Ya no tienes bombas disponibles.");
+    }
+    const casilla = partida.casillas?.[casillaClave];
+    if (!casilla) {
+      throw new HttpsError("invalid-argument", "Casilla inválida.");
+    }
 
-  if (!partida) {
-    throw new HttpsError("not-found", "La partida no existe.");
-  }
-  if (partida.estado !== "preparacion") {
-    throw new HttpsError("failed-precondition", "No estás en fase de preparación.");
-  }
-
-  if (partida.turnoColocacion?.uidActivo !== uid) {
-    throw new HttpsError("failed-precondition", "No es tu turno de colocar bombas.");
-  }
-
-  const jugador = partida.jugadores?.[uid];
-  if (!jugador) {
-    throw new HttpsError("permission-denied", "No perteneces a esta partida.");
-  }
-  if ((jugador.bombasDisponibles || 0) <= 0) {
-    throw new HttpsError("failed-precondition", "Ya no tienes bombas disponibles.");
-  }
-  if (!partida.casillas?.[casillaClave]) {
-    throw new HttpsError("invalid-argument", "Casilla inválida.");
-  }
-
-  // Leemos las bombas actuales de esa casilla (puede que no exista el campo todavía)
-  const casillaActual = partida.casillas[casillaClave];
-  const bombasActuales = casillaActual.bombas || [];
-
-  const nuevaBomba = {
-    uid,
-    tipo: jugador.clase || "veneno",
-    dano: jugador.clase ? obtenerDanoBomba(jugador.clase) : 0,
-    colocadaEn: Date.now(),
-  };
-
-  const updates = {};
-  updates[`partidas/${partidaId}/casillas/${casillaClave}/bombas`] = [
-    ...bombasActuales,
-    nuevaBomba,
-  ];
-  updates[`partidas/${partidaId}/jugadores/${uid}/bombasDisponibles`] =
-    jugador.bombasDisponibles - 1;
-  updates[`partidas/${partidaId}/jugadores/${uid}/coloco`] = true;
-
-  await rtdb.ref().update(updates);
+    casilla.bombas = [
+      ...(casilla.bombas || []),
+      {
+        uid,
+        tipo: jugador.clase || "veneno",
+        dano: jugador.clase ? obtenerDanoBomba(jugador.clase) : 0,
+        colocadaEn: Date.now(),
+      },
+    ];
+    jugador.bombasDisponibles -= 1;
+    jugador.coloco = true;
+    return { clase: jugador.clase, restantes: jugador.bombasDisponibles };
+  });
 
   await registrarProgreso(uid, "bomba_colocada", 1);
-  if (jugador.clase === "bombota") {
+  if (info.clase === "bombota") {
     await registrarProgreso(uid, "partida_con_bombota", 1);
   }
 
-  return { exito: true, bombasRestantes: jugador.bombasDisponibles - 1 };
+  return { exito: true, bombasRestantes: info.restantes };
 });
 
 exports.tickVeneno = onCall(async (request) => {
@@ -576,129 +687,103 @@ exports.tickVeneno = onCall(async (request) => {
   const { partidaId } = request.data || {};
   if (!partidaId) throw new HttpsError("invalid-argument", "Falta el ID de partida.");
 
-  const partidaSnap = await rtdb.ref(`partidas/${partidaId}`).once("value");
-  const partida = partidaSnap.val();
-
-  if (!partida || partida.estado !== "en_curso" || partida.modalidad !== "venenosas") {
-    return { aplicado: false };
-  }
-  if (!partida.jugadores?.[uid]) {
-    throw new HttpsError("permission-denied", "No perteneces a esta partida.");
-  }
-
   const TICK_MS = 10000;
-  const ahora = Date.now();
-  const jugador = partida.jugadores[uid];
-  const cargas = jugador.cargasVeneno || [];
-
-  if (cargas.length === 0) return { aplicado: false };
-
-  let dañoTotal = 0;
-  const cargasActualizadas = cargas.map((carga) => {
-    const intervalosTranscurridos = Math.floor((ahora - carga.ultimoTick) / TICK_MS);
-    if (intervalosTranscurridos > 0) {
-      dañoTotal += intervalosTranscurridos * 0.25;
-      return { ...carga, ultimoTick: carga.ultimoTick + intervalosTranscurridos * TICK_MS };
+  const { info } = await transaccionPartida(partidaId, (partida) => {
+    if (partida.estado !== "en_curso" || partida.modalidad !== "venenosas") return undefined;
+    const jugador = partida.jugadores?.[uid];
+    if (!jugador) {
+      throw new HttpsError("permission-denied", "No perteneces a esta partida.");
     }
-    return carga;
+    const cargas = jugador.cargasVeneno || [];
+    if (cargas.length === 0) return undefined;
+
+    const ahora = Date.now();
+    let danoTotal = 0;
+    jugador.cargasVeneno = cargas.map((carga) => {
+      const intervalos = Math.floor((ahora - carga.ultimoTick) / TICK_MS);
+      if (intervalos <= 0) return carga;
+      danoTotal += intervalos * 0.25;
+      return { ...carga, ultimoTick: carga.ultimoTick + intervalos * TICK_MS };
+    });
+    if (danoTotal === 0) return undefined;
+
+    jugador.vidas = Math.max(0, jugador.vidas - danoTotal);
+    return { danoTotal, vidasNuevas: jugador.vidas };
   });
 
-  if (dañoTotal === 0) return { aplicado: false };
+  if (!info) return { aplicado: false };
+  console.log(`[Veneno] Tick para ${uid}: -${info.danoTotal}, vidas=${info.vidasNuevas}`);
 
-  const vidasNuevas = Math.max(0, jugador.vidas - dañoTotal);
-
-  await rtdb.ref(`partidas/${partidaId}/jugadores/${uid}`).update({
-    vidas: vidasNuevas,
-    cargasVeneno: cargasActualizadas,
-  });
-
-  console.log(`[Veneno] Tick para ${uid}: -${dañoTotal}, vidas=${vidasNuevas}`);
-
-  if (vidasNuevas <= 0) {
-    const uidRival = Object.keys(partida.jugadores).find((id) => id !== uid);
-    await finalizarPartidaPorDerrota(partidaId, uid, uidRival);
-    return { aplicado: true, resultado: "derrota", vidasNuevas };
+  if (info.vidasNuevas <= 0) {
+    await finalizarPartidaPorDerrota(partidaId, uid);
+    return { aplicado: true, resultado: "derrota", vidasNuevas: info.vidasNuevas };
   }
-
-  return { aplicado: true, vidasNuevas };
+  return { aplicado: true, vidasNuevas: info.vidasNuevas };
 });
 
 async function avanzarFaseColocacion(partidaId, uidQueTermina) {
-  const partidaSnap = await rtdb.ref(`partidas/${partidaId}`).once("value");
-  const partida = partidaSnap.val();
-  if (!partida || partida.estado !== "preparacion") return;
-
-  // Verificación de idempotencia SIN transacción: si el turno activo ya
-  // no es este jugador, alguien más ya lo procesó - abortamos limpio.
+  const partida = (await rtdb.ref(`partidas/${partidaId}`).once("value")).val();
+  if (!partida || partida.estado !== "preparacion" || partida.esperandoJugadores) return;
   if (partida.turnoColocacion?.uidActivo !== uidQueTermina) {
     console.log(`[Preparación] Turno ya fue procesado para ${uidQueTermina}, abortando.`);
     return;
   }
+  const rondaLeida = partida.ronda;
 
-  // Esperamos a que la última bomba complete su visibilidad de 3s
-  const TIEMPO_VISIBLE_MS = 3000;
-  const casillas = partida.casillas || {};
+  // Esperamos a que la última bomba complete su visibilidad de 3 s.
   let bombaMasReciente = 0;
-  Object.values(casillas).forEach((casilla) => {
+  Object.values(partida.casillas || {}).forEach((casilla) => {
     (casilla.bombas || []).forEach((bomba) => {
       if (bomba.colocadaEn > bombaMasReciente) bombaMasReciente = bomba.colocadaEn;
     });
   });
   const tiempoDesdeUltimaBomba = Date.now() - bombaMasReciente;
-  if (bombaMasReciente > 0 && tiempoDesdeUltimaBomba < TIEMPO_VISIBLE_MS) {
-    await new Promise((resolve) => setTimeout(resolve, TIEMPO_VISIBLE_MS - tiempoDesdeUltimaBomba));
+  if (bombaMasReciente > 0 && tiempoDesdeUltimaBomba < TIEMPO_VISIBLE_BOMBA_MS) {
+    await esperar(TIEMPO_VISIBLE_BOMBA_MS - tiempoDesdeUltimaBomba);
   }
 
-  // Re-verificamos justo antes de escribir, por si algo cambió durante la espera
-  const partidaFrescaSnap = await rtdb.ref(`partidas/${partidaId}`).once("value");
-  const partidaFresca = partidaFrescaSnap.val();
-  if (!partidaFresca || partidaFresca.turnoColocacion?.uidActivo !== uidQueTermina) {
-    console.log(`[Preparación] Turno cambió durante la espera para ${uidQueTermina}, abortando.`);
-    return;
-  }
+  const { aplicado, info } = await transaccionPartida(partidaId, (p) => {
+    // Si otra llamada ya cerró este turno, no se vuelve a cerrar.
+    if (
+      p.estado !== "preparacion" ||
+      p.ronda !== rondaLeida ||
+      p.esperandoJugadores ||
+      p.turnoColocacion?.uidActivo !== uidQueTermina
+    ) {
+      return undefined;
+    }
+    const uidRival = Object.keys(p.jugadores).find((id) => id !== uidQueTermina);
+    p.jugadores[uidQueTermina].yaColoco = true;
 
-  const uids = Object.keys(partidaFresca.jugadores);
-  const uidRival = uids.find((id) => id !== uidQueTermina);
-  const yaJugoRival = partidaFresca.jugadores[uidRival]?.yaColoco === true;
-
-  if (!yaJugoRival) {
-    const DURACION_TURNO_MS = 30000;
-    await rtdb.ref(`partidas/${partidaId}`).update({
-      [`jugadores/${uidQueTermina}/yaColoco`]: true,
-      turnoColocacion: {
-        uidActivo: uidRival,
-        inicioEn: Date.now(),
-        finalizaEn: Date.now() + DURACION_TURNO_MS,
-      },
-    });
-    console.log(`[Preparación] Turno de ${uidQueTermina} terminado, pasa a ${uidRival}`);
-  } else {
-    const coloroQuienTermina = partidaFresca.jugadores[uidQueTermina]?.coloco === true;
-    const coloroRival = partidaFresca.jugadores[uidRival]?.coloco === true;
-
-    if (partidaFresca.ronda === 1 && !coloroQuienTermina && !coloroRival) {
-      await rtdb.ref(`partidas/${partidaId}`).update({
-        [`jugadores/${uidQueTermina}/yaColoco`]: true,
-        estado: "cancelada",
-        turnoColocacion: null,
-        motivoCancelacion: "inactividad",
-      });
-      console.log(`[Preparación] Partida ${partidaId} cancelada: nadie colocó bombas`);
-      return;
+    if (p.jugadores[uidRival]?.yaColoco !== true) {
+      p.turnoColocacion = nuevoTurno(uidRival, DURACION_TURNO_COLOCACION_MS);
+      return { tipo: "turno", uidRival };
     }
 
-    const uidAzul = uids.find((id) => partidaFresca.jugadores[id].color === "azul");
-    await rtdb.ref(`partidas/${partidaId}`).update({
-      [`jugadores/${uidQueTermina}/yaColoco`]: true,
-      estado: "en_curso",
-      turnoColocacion: null,
-      turnoActual: uidAzul,
-      turnoJuego: {
-        uidActivo: uidAzul,
-        inicioEn: Date.now(),
-        finalizaEn: Date.now() + duracionTurnoJuego(partidaFresca.ronda),
-      },
-    });
+    const colocoQuienTermina = p.jugadores[uidQueTermina]?.coloco === true;
+    const colocoRival = p.jugadores[uidRival]?.coloco === true;
+    if (p.ronda === 1 && !colocoQuienTermina && !colocoRival) {
+      p.estado = "cancelada";
+      p.motivoCancelacion = "inactividad";
+      delete p.turnoColocacion;
+      return { tipo: "cancelada" };
+    }
+
+    const uidAzul = Object.keys(p.jugadores).find((id) => p.jugadores[id].color === "azul");
+    p.estado = "en_curso";
+    delete p.turnoColocacion;
+    p.turnoActual = uidAzul;
+    p.turnoJuego = nuevoTurno(uidAzul, duracionTurnoJuego(p.ronda));
+    return { tipo: "en_curso" };
+  });
+
+  if (!aplicado) {
+    console.log(`[Preparación] Turno de ${uidQueTermina} ya procesado por otra llamada.`);
+  } else if (info.tipo === "turno") {
+    console.log(`[Preparación] Turno de ${uidQueTermina} terminado, pasa a ${info.uidRival}`);
+  } else if (info.tipo === "cancelada") {
+    console.log(`[Preparación] Partida ${partidaId} cancelada: nadie colocó bombas`);
+  } else {
     console.log(`[Preparación] Ambos listos, partida ${partidaId} inicia`);
   }
 }
@@ -714,9 +799,7 @@ exports.finalizarTurnoColocacion = onCall(async (request) => {
     throw new HttpsError("invalid-argument", "Falta el ID de partida.");
   }
 
-  const partidaSnap = await rtdb.ref(`partidas/${partidaId}`).once("value");
-  const partida = partidaSnap.val();
-
+  const partida = (await rtdb.ref(`partidas/${partidaId}`).once("value")).val();
   if (!partida) {
     throw new HttpsError("not-found", "La partida no existe.");
   }
@@ -728,8 +811,8 @@ exports.finalizarTurnoColocacion = onCall(async (request) => {
   return { exito: true };
 });
 
-// --- NUEVO: verificación de timeout, puede llamarla cualquiera de los dos
-// jugadores, pero la decisión real usa el reloj del servidor, no el cliente.
+// Puede llamarla cualquiera de los dos jugadores; la decisión usa el reloj
+// del servidor, no el del cliente.
 exports.verificarTimeoutColocacion = onCall(async (request) => {
   const uid = request.auth?.uid;
   if (!uid) {
@@ -741,10 +824,8 @@ exports.verificarTimeoutColocacion = onCall(async (request) => {
     throw new HttpsError("invalid-argument", "Falta el ID de partida.");
   }
 
-  const partidaSnap = await rtdb.ref(`partidas/${partidaId}`).once("value");
-  const partida = partidaSnap.val();
-
-  if (!partida || partida.estado !== "preparacion") {
+  const partida = (await rtdb.ref(`partidas/${partidaId}`).once("value")).val();
+  if (!partida || partida.estado !== "preparacion" || partida.esperandoJugadores) {
     return { expirado: false };
   }
   if (!partida.jugadores?.[uid]) {
@@ -753,32 +834,22 @@ exports.verificarTimeoutColocacion = onCall(async (request) => {
 
   const finalizaEn = partida.turnoColocacion?.finalizaEn;
   const ahoraServidor = Date.now();
-
   if (!finalizaEn || ahoraServidor < finalizaEn) {
     return { expirado: false };
   }
 
-  const TIEMPO_VISIBLE_MS = 3000;
-  const casillas = partida.casillas || {};
   let bombaMasReciente = 0;
-
-  Object.values(casillas).forEach((casilla) => {
+  Object.values(partida.casillas || {}).forEach((casilla) => {
     (casilla.bombas || []).forEach((bomba) => {
-      if (bomba.colocadaEn > bombaMasReciente) {
-        bombaMasReciente = bomba.colocadaEn;
-      }
+      if (bomba.colocadaEn > bombaMasReciente) bombaMasReciente = bomba.colocadaEn;
     });
   });
-
-  const tiempoDesdeUltimaBomba = ahoraServidor - bombaMasReciente;
-  if (bombaMasReciente > 0 && tiempoDesdeUltimaBomba < TIEMPO_VISIBLE_MS) {
+  if (bombaMasReciente > 0 && ahoraServidor - bombaMasReciente < TIEMPO_VISIBLE_BOMBA_MS) {
     // Todavía hay una bomba visible; no avanzamos todavía.
     return { expirado: false, esperandoOcultamiento: true };
   }
 
-  const uidActivo = partida.turnoColocacion.uidActivo;
-  await avanzarFaseColocacion(partidaId, uidActivo);
-
+  await avanzarFaseColocacion(partidaId, partida.turnoColocacion.uidActivo);
   return { expirado: true };
 });
 
@@ -797,93 +868,97 @@ function duracionSonidoDetonacion(bombas) {
 
 const esperar = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-async function iniciarNuevaRonda(partidaId, uidInicial) {
-  const partidaSnap = await rtdb.ref(`partidas/${partidaId}`).once("value");
-  const partida = partidaSnap.val();
-  if (!partida) return;
-
+/**
+ * Prepara la siguiente ronda sobre el objeto `partida` (dentro de una
+ * transacción). Devuelve false si ya se jugaron las 10 rondas (RQNF-GAM-10).
+ */
+function prepararNuevaRonda(partida, uidInicial) {
   const nuevaRonda = partida.ronda + 1;
+  if (nuevaRonda > 10) return false;
 
-  if (nuevaRonda > 10) {
-    // RQNF-GAM-10: límite de rondas alcanzado, se decide por vidas restantes
-    await resolverDesempatePorRondas(partidaId, partida);
-    return;
-  }
+  const esVenenosas = partida.modalidad === "venenosas";
+  partida.ronda = nuevaRonda;
+  partida.casillas = generarCasillas(partida.tablero, nuevaRonda);
+  partida.estado = "preparacion";
+  delete partida.turnoJuego;
+  delete partida.detonacion;
+  partida.turnoColocacion = nuevoTurno(uidInicial, DURACION_TURNO_COLOCACION_MS);
 
-  const casillasNuevas = generarCasillas(partida.tablero, nuevaRonda);
-  const uids = Object.keys(partida.jugadores);
-
-  const updates = {
-    ronda: nuevaRonda,
-    casillas: casillasNuevas,
-    estado: "preparacion",
-    turnoJuego: null,
-    detonacion: null,
-    turnoColocacion: {
-      uidActivo: uidInicial,
-      inicioEn: Date.now(),
-      finalizaEn: Date.now() + 30000,
-    },
-  };
-
-  uids.forEach((id) => {
-    const esVenenosas = partida.modalidad === "venenosas";
-    const clase = partida.jugadores[id].clase;
-    updates[`jugadores/${id}/bombasDisponibles`] = esVenenosas
+  for (const id of Object.keys(partida.jugadores)) {
+    const jugador = partida.jugadores[id];
+    jugador.bombasDisponibles = esVenenosas
       ? obtenerCantidadBombasVenenosas(nuevaRonda)
-      : obtenerCantidadBombas(clase, nuevaRonda);
-    updates[`jugadores/${id}/yaColoco`] = false;
-    updates[`jugadores/${id}/coloco`] = false;
-    updates[`jugadores/${id}/cargasVeneno`] = [];
-  });
-
-  await rtdb.ref(`partidas/${partidaId}`).update(updates);
-  console.log(`[Ronda] Nueva ronda ${nuevaRonda} para partida ${partidaId}, inicia ${uidInicial}`);
+      : obtenerCantidadBombas(jugador.clase, nuevaRonda);
+    jugador.yaColoco = false;
+    jugador.coloco = false;
+    jugador.cargasVeneno = [];
+  }
+  return true;
 }
 
-// Reemplaza tu resolverDesempatePorRondas actual por esta versión:
-async function resolverDesempatePorRondas(partidaId, partida) {
-  const uids = Object.keys(partida.jugadores);
-  const [uidA, uidB] = uids;
-  const vidasA = partida.jugadores[uidA].vidas;
-  const vidasB = partida.jugadores[uidB].vidas;
+// Cambia de ronda solo si la partida sigue en la ronda `rondaEsperada`;
+// así una llamada repetida no se salta rondas.
+async function iniciarNuevaRonda(partidaId, uidInicial, rondaEsperada) {
+  let limiteAlcanzado = false;
+  const { aplicado, partida } = await transaccionPartida(partidaId, (p) => {
+    limiteAlcanzado = false;
+    if (p.estado !== "en_curso" || p.ronda !== rondaEsperada) return undefined;
+    if (!prepararNuevaRonda(p, uidInicial)) {
+      limiteAlcanzado = true;
+      return undefined;
+    }
+    return true;
+  });
 
-  const updates = { estado: "finalizada", turnoJuego: null };
-
-  if (vidasA === vidasB) {
-    updates.resultado = "empate";
-  } else {
-    const uidGanador = vidasA > vidasB ? uidA : uidB;
-    updates.resultado = "victoria";
-    updates.ganador = uidGanador;
-  }
-
-  await rtdb.ref(`partidas/${partidaId}`).update(updates);
-  console.log(`[Partida] Finalizada por límite de rondas: ${partidaId}`);
-
-  const partidaActualizada = { ...partida, ...updates };
-  if (updates.resultado === "empate") {
-    await aplicarResultadoCompetitivo(partidaId, partidaActualizada, { tipo: "empate" });
-  } else {
-    await aplicarResultadoCompetitivo(partidaId, partidaActualizada, {
-      tipo: "victoria",
-      ganador: updates.ganador,
-    });
+  if (limiteAlcanzado) {
+    await resolverDesempatePorRondas(partidaId);
+  } else if (aplicado) {
+    console.log(`[Ronda] Nueva ronda ${partida.ronda} para partida ${partidaId}, inicia ${uidInicial}`);
   }
 }
 
-async function finalizarPartidaPorDerrota(partidaId, uidPerdedor, uidGanador) {
-  await rtdb.ref(`partidas/${partidaId}`).update({
-    estado: "finalizada",
-    resultado: "victoria",
-    ganador: uidGanador,
-    turnoJuego: null,
+// Termina la partida una sola vez y solo entonces aplica Elo y estadísticas.
+async function terminarPartida(partidaId, decidir) {
+  const { aplicado, info, partida } = await transaccionPartida(partidaId, (p) => {
+    if (p.estado === "finalizada" || p.estado === "cancelada") return undefined;
+    const resultado = decidir(p);
+    p.estado = "finalizada";
+    delete p.turnoJuego;
+    delete p.turnoColocacion;
+    if (resultado.empate) {
+      p.resultado = "empate";
+      delete p.ganador;
+    } else {
+      p.resultado = "victoria";
+      p.ganador = resultado.ganador;
+    }
+    return resultado;
   });
-  console.log(`[Partida] ${partidaId} finalizada, ganador: ${uidGanador}`);
+  if (!aplicado) return;
 
-  const partidaSnap = await rtdb.ref(`partidas/${partidaId}`).once("value");
-  const partida = partidaSnap.val();
-  await aplicarResultadoCompetitivo(partidaId, partida, { tipo: "victoria", ganador: uidGanador });
+  console.log(`[Partida] ${partidaId} finalizada: ${info.empate ? "empate" : `gana ${info.ganador}`}`);
+  await aplicarResultadoCompetitivo(
+    partidaId,
+    partida,
+    info.empate ? { tipo: "empate" } : { tipo: "victoria", ganador: info.ganador }
+  );
+}
+
+// RQNF-GAM-10: límite de rondas alcanzado, se decide por vidas restantes.
+async function resolverDesempatePorRondas(partidaId) {
+  await terminarPartida(partidaId, (p) => {
+    const [uidA, uidB] = Object.keys(p.jugadores);
+    const vidasA = p.jugadores[uidA].vidas;
+    const vidasB = p.jugadores[uidB].vidas;
+    if (vidasA === vidasB) return { empate: true };
+    return { ganador: vidasA > vidasB ? uidA : uidB };
+  });
+}
+
+async function finalizarPartidaPorDerrota(partidaId, uidPerdedor) {
+  await terminarPartida(partidaId, (p) => ({
+    ganador: Object.keys(p.jugadores).find((id) => id !== uidPerdedor),
+  }));
 }
 
 exports.activarCasilla = onCall(async (request) => {
@@ -897,118 +972,109 @@ exports.activarCasilla = onCall(async (request) => {
     throw new HttpsError("invalid-argument", "Faltan datos.");
   }
 
-  const partidaSnap = await rtdb.ref(`partidas/${partidaId}`).once("value");
-  const partida = partidaSnap.val();
+  const { info } = await transaccionPartida(partidaId, (partida) => {
+    if (partida.estado !== "en_curso") {
+      throw new HttpsError("failed-precondition", "La partida no está en curso.");
+    }
+    if (partida.turnoJuego?.uidActivo !== uid) {
+      throw new HttpsError("failed-precondition", "No es tu turno.");
+    }
+    const finalizaEn = partida.turnoJuego.finalizaEn;
+    if (finalizaEn && Date.now() > finalizaEn + GRACIA_TURNO_MS) {
+      throw new HttpsError("failed-precondition", "Se acabó el tiempo de tu turno.");
+    }
 
-  if (!partida) throw new HttpsError("not-found", "La partida no existe.");
-  if (partida.estado !== "en_curso") {
-    throw new HttpsError("failed-precondition", "La partida no está en curso.");
-  }
-  if (partida.turnoJuego?.uidActivo !== uid) {
-    throw new HttpsError("failed-precondition", "No es tu turno.");
-  }
+    const casilla = partida.casillas?.[casillaClave];
+    if (!casilla) throw new HttpsError("invalid-argument", "Casilla inválida.");
+    if (casilla.segura === true) {
+      throw new HttpsError("failed-precondition", "Esa casilla ya está bloqueada.");
+    }
+    if (casilla.detonada === true) {
+      throw new HttpsError("failed-precondition", "Esa casilla ya fue detonada.");
+    }
 
-  const casilla = partida.casillas?.[casillaClave];
-  if (!casilla) throw new HttpsError("invalid-argument", "Casilla inválida.");
-  if (casilla.segura === true) {
-    throw new HttpsError("failed-precondition", "Esa casilla ya está bloqueada.");
-  }
-  if (casilla.detonada === true) {
-    throw new HttpsError("failed-precondition", "Esa casilla ya fue detonada.");
-  }
+    const uidRival = Object.keys(partida.jugadores).find((id) => id !== uid);
+    const jugador = partida.jugadores[uid];
+    const bombas = casilla.bombas || [];
+    const ronda = partida.ronda;
 
-  const uids = Object.keys(partida.jugadores);
-  const uidRival = uids.find((id) => id !== uid);
-  const bombas = casilla.bombas || [];
-
-  if (bombas.length > 0) {
-    if (partida.modalidad === "venenosas") {
-    // --- Modo Venenosas: aplica cargas de veneno, NO termina la ronda ---
-      const cantidadCargas = bombas.length;
+    if (bombas.length > 0 && partida.modalidad === "venenosas") {
+      // Venenosas: aplica cargas de veneno, NO termina la ronda.
       const ahora = Date.now();
-      const dañoInicial = cantidadCargas * 0.25;
-
-      const cargasActuales = partida.jugadores[uid].cargasVeneno || [];
-      const nuevasCargas = [];
-      for (let i = 0; i < cantidadCargas; i++) {
-        nuevasCargas.push({ creadaEn: ahora, ultimoTick: ahora });
-      }
-
-      const vidasActuales = partida.jugadores[uid].vidas;
-      const vidasNuevas = Math.max(0, vidasActuales - dañoInicial);
-
-      const updates = {};
-      updates[`casillas/${casillaClave}/detonada`] = true;
-      updates[`jugadores/${uid}/vidas`] = vidasNuevas;
-      updates[`jugadores/${uid}/cargasVeneno`] = [...cargasActuales, ...nuevasCargas];
-      updates.turnoJuego = {
-        uidActivo: uidRival,
-        inicioEn: Date.now(),
-        finalizaEn: Date.now() + duracionTurnoJuego(partida.ronda),
-      };
-
-      await rtdb.ref(`partidas/${partidaId}`).update(updates);
-      console.log(`[Veneno] ${uid} detonó ${casillaClave}, cargas=${cantidadCargas}, daño inicial=${dañoInicial}, vidas=${vidasNuevas}`);
-
-      if (vidasNuevas <= 0) {
-        await finalizarPartidaPorDerrota(partidaId, uid, uidRival);
-        return { resultado: "derrota", vidasNuevas };
-      }
-
-      return { resultado: "veneno_aplicado", cargas: cantidadCargas, vidasNuevas };
+      const cantidadCargas = bombas.length;
+      casilla.detonada = true;
+      jugador.vidas = Math.max(0, jugador.vidas - cantidadCargas * 0.25);
+      jugador.cargasVeneno = [
+        ...(jugador.cargasVeneno || []),
+        ...Array.from({ length: cantidadCargas }, () => ({ creadaEn: ahora, ultimoTick: ahora })),
+      ];
+      partida.turnoJuego = nuevoTurno(uidRival, duracionTurnoJuego(ronda));
+      return { tipo: "veneno", cantidadCargas, vidasNuevas: jugador.vidas };
     }
 
-    const danoTotal = bombas.reduce((sum, b) => sum + (b.dano || 0), 0);
-    const vidasActuales = partida.jugadores[uid].vidas;
-    const vidasNuevas = Math.max(0, vidasActuales - danoTotal);
-
-    const duracionDetonacion = duracionSonidoDetonacion(bombas);
-    await rtdb.ref(`partidas/${partidaId}`).update({
-      [`casillas/${casillaClave}/detonada`]: true,
-      [`jugadores/${uid}/vidas`]: vidasNuevas,
-      turnoJuego: null,
-      detonacion: { casilla: casillaClave, uid, en: Date.now(), duracionMs: duracionDetonacion },
-    });
-    console.log(`[Juego] ${uid} detonó ${casillaClave}, daño=${danoTotal}, vidas restantes=${vidasNuevas}`);
-    await esperar(duracionDetonacion);
-
-    if (vidasNuevas <= 0) {
-      await finalizarPartidaPorDerrota(partidaId, uid, uidRival);
-      return { resultado: "derrota", vidasNuevas };
+    if (bombas.length > 0) {
+      // Estándar: detonación. El turno se congela mientras suena la explosión.
+      const danoTotal = bombas.reduce((sum, b) => sum + (b.dano || 0), 0);
+      const duracionMs = duracionSonidoDetonacion(bombas);
+      casilla.detonada = true;
+      jugador.vidas = Math.max(0, jugador.vidas - danoTotal);
+      delete partida.turnoJuego;
+      partida.detonacion = { casilla: casillaClave, uid, en: Date.now(), duracionMs };
+      return { tipo: "detonacion", danoTotal, duracionMs, vidasNuevas: jugador.vidas, ronda, uidRival };
     }
 
-    const uidInicioSiguiente = siguienteInicioColocacion("detonacion", uid, uidRival);
-    await iniciarNuevaRonda(partidaId, uidInicioSiguiente);
-    return { resultado: "detonacion", vidasNuevas };
-  } else {
-    await registrarProgreso(uid, "casilla_segura_descubierta", 1);
-
-    const updates = {};
-    updates[`casillas/${casillaClave}/segura`] = true;
-
-    const todasLasCasillas = { ...partida.casillas, [casillaClave]: { ...casilla, segura: true } };
-
-    const casillasSinBomba = Object.values(todasLasCasillas).filter(
-      (c) => !(c.bombas && c.bombas.length > 0)
+    // Casilla segura
+    casilla.segura = true;
+    const quedanSeguras = Object.values(partida.casillas).some(
+      (c) => !(c.bombas && c.bombas.length > 0) && c.segura !== true
     );
-
-    const quedanSegurasSinMarcar = casillasSinBomba.some((c) => c.segura !== true);
-
-    if (!quedanSegurasSinMarcar) {
-    // Limpieza completa -> fin de ronda
-      await rtdb.ref(`partidas/${partidaId}`).update(updates);
-      const uidInicioSiguiente = siguienteInicioColocacion("limpieza", uid, uidRival);
-      await iniciarNuevaRonda(partidaId, uidInicioSiguiente);
-      return { resultado: "limpieza_completa" };
-    } else {
-      updates.turnoJuego = {
-        uidActivo: uidRival,
-        inicioEn: Date.now(),
-        finalizaEn: Date.now() + duracionTurnoJuego(partida.ronda),
-      };
-      await rtdb.ref(`partidas/${partidaId}`).update(updates);
-      return { resultado: "segura" };
+    if (quedanSeguras) {
+      partida.turnoJuego = nuevoTurno(uidRival, duracionTurnoJuego(ronda));
+      return { tipo: "segura" };
     }
+    // Limpieza completa: fin de ronda en la misma transacción.
+    const uidInicio = siguienteInicioColocacion("limpieza", uid, uidRival);
+    if (!prepararNuevaRonda(partida, uidInicio)) {
+      delete partida.turnoJuego;
+      return { tipo: "limite_rondas" };
+    }
+    return { tipo: "limpieza" };
+  });
+
+  if (info.tipo === "segura" || info.tipo === "limpieza" || info.tipo === "limite_rondas") {
+    await registrarProgreso(uid, "casilla_segura_descubierta", 1);
+  }
+
+  switch (info.tipo) {
+    case "veneno":
+      console.log(`[Veneno] ${uid} detonó ${casillaClave}, cargas=${info.cantidadCargas}, vidas=${info.vidasNuevas}`);
+      if (info.vidasNuevas <= 0) {
+        await finalizarPartidaPorDerrota(partidaId, uid);
+        return { resultado: "derrota", vidasNuevas: info.vidasNuevas };
+      }
+      return { resultado: "veneno_aplicado", cargas: info.cantidadCargas, vidasNuevas: info.vidasNuevas };
+
+    case "detonacion": {
+      console.log(`[Juego] ${uid} detonó ${casillaClave}, daño=${info.danoTotal}, vidas restantes=${info.vidasNuevas}`);
+      await esperar(info.duracionMs);
+      if (info.vidasNuevas <= 0) {
+        await finalizarPartidaPorDerrota(partidaId, uid);
+        return { resultado: "derrota", vidasNuevas: info.vidasNuevas };
+      }
+      const uidInicio = siguienteInicioColocacion("detonacion", uid, info.uidRival);
+      await iniciarNuevaRonda(partidaId, uidInicio, info.ronda);
+      return { resultado: "detonacion", vidasNuevas: info.vidasNuevas };
+    }
+
+    case "limite_rondas":
+      await resolverDesempatePorRondas(partidaId);
+      return { resultado: "limpieza_completa" };
+
+    case "limpieza":
+      return { resultado: "limpieza_completa" };
+
+    default:
+      return { resultado: "segura" };
   }
 });
 
@@ -1019,47 +1085,50 @@ exports.verificarTimeoutJuego = onCall(async (request) => {
   const { partidaId } = request.data || {};
   if (!partidaId) throw new HttpsError("invalid-argument", "Falta el ID de partida.");
 
-  const partidaSnap = await rtdb.ref(`partidas/${partidaId}`).once("value");
-  const partida = partidaSnap.val();
+  const { info } = await transaccionPartida(partidaId, (partida) => {
+    if (partida.estado !== "en_curso") return undefined;
+    if (!partida.jugadores?.[uid]) {
+      throw new HttpsError("permission-denied", "No perteneces a esta partida.");
+    }
+    const turno = partida.turnoJuego;
+    // Con gracia: una jugada hecha a tiempo pero lenta todavía puede llegar.
+    if (!turno?.finalizaEn || Date.now() < turno.finalizaEn + GRACIA_TURNO_MS) return undefined;
 
-  if (!partida || partida.estado !== "en_curso") return { expirado: false };
-  if (!partida.jugadores?.[uid]) {
-    throw new HttpsError("permission-denied", "No perteneces a esta partida.");
-  }
+    const uidActivo = turno.uidActivo;
+    const uidRival = Object.keys(partida.jugadores).find((id) => id !== uidActivo);
+    const jugador = partida.jugadores[uidActivo];
+    jugador.vidas = Math.max(0, jugador.vidas - 1); // RQF-GAM-09: pierde 1 vida
 
-  const finalizaEn = partida.turnoJuego?.finalizaEn;
-  if (!finalizaEn || Date.now() < finalizaEn) return { expirado: false };
+    if (jugador.vidas <= 0) {
+      delete partida.turnoJuego;
+      return { tipo: "derrota", uidActivo, vidasNuevas: 0 };
+    }
+    if (partida.modalidad === "venenosas") {
+      // En Venenosas el timeout solo pasa el turno; la ronda avanza al
+      // limpiar todas las casillas seguras (RQF-MOD-01/02).
+      partida.turnoJuego = nuevoTurno(uidRival, duracionTurnoJuego(partida.ronda));
+      return { tipo: "pasa_turno", uidActivo, vidasNuevas: jugador.vidas };
+    }
+    // Estándar: termina la ronda.
+    const uidInicio = siguienteInicioColocacion("detonacion", uidActivo, uidRival);
+    if (!prepararNuevaRonda(partida, uidInicio)) {
+      delete partida.turnoJuego;
+      return { tipo: "limite_rondas", uidActivo, vidasNuevas: jugador.vidas };
+    }
+    return { tipo: "nueva_ronda", uidActivo, vidasNuevas: jugador.vidas };
+  });
 
-  const uidActivo = partida.turnoJuego.uidActivo;
-  const uidRival = Object.keys(partida.jugadores).find((id) => id !== uidActivo);
-  const vidasActuales = partida.jugadores[uidActivo].vidas;
-  const vidasNuevas = Math.max(0, vidasActuales - 1); // RQF-GAM-09: pierde 1 vida
+  if (!info) return { expirado: false };
+  console.log(`[Juego] Timeout de ${info.uidActivo}, pierde 1 vida, restantes=${info.vidasNuevas}`);
 
-  await rtdb.ref(`partidas/${partidaId}/jugadores/${uidActivo}/vidas`).set(vidasNuevas);
-  console.log(`[Juego] Timeout de ${uidActivo}, pierde 1 vida, restantes=${vidasNuevas}`);
-
-  if (vidasNuevas <= 0) {
-    await finalizarPartidaPorDerrota(partidaId, uidActivo, uidRival);
+  if (info.tipo === "derrota") {
+    await finalizarPartidaPorDerrota(partidaId, info.uidActivo);
     return { expirado: true, resultado: "derrota" };
   }
-
-  if (partida.modalidad === "venenosas") {
-    // En Venenosas, el timeout SOLO pasa el turno - la ronda únicamente
-    // avanza al limpiar todas las casillas seguras (RQF-MOD-01/02).
-    await rtdb.ref(`partidas/${partidaId}/turnoJuego`).set({
-      uidActivo: uidRival,
-      inicioEn: Date.now(),
-      finalizaEn: Date.now() + duracionTurnoJuego(partida.ronda),
-    });
-    console.log(`[Veneno] Timeout: turno pasa a ${uidRival}, misma ronda`);
-    return { expirado: true, resultado: "timeout_pasa_turno" };
+  if (info.tipo === "limite_rondas") {
+    await resolverDesempatePorRondas(partidaId);
   }
-
-  // Estándar: comportamiento original, termina la ronda
-  const uidInicioSiguiente = siguienteInicioColocacion("detonacion", uidActivo, uidRival);
-  await iniciarNuevaRonda(partidaId, uidInicioSiguiente);
-
-  return { expirado: true, resultado: "timeout" };
+  return { expirado: true, resultado: info.tipo === "pasa_turno" ? "timeout_pasa_turno" : "timeout" };
 });
 
 exports.rotarMisionesDiarias = require("./misiones").rotarMisionesDiarias;
@@ -1127,12 +1196,18 @@ async function avanzarTurnoElemental(partidaId, uidPropuesto) {
 
 async function finalizarPartidaElemental(partidaId, partida) {
   const resultado = resolverGanadorPorCasillas(partida);
-  await rtdb.ref(`partidas/${partidaId}`).update({
-    estado: "finalizada",
-    turnoActual: null,
-    resultado: resultado.empate ? "empate" : "victoria",
-    ganador: resultado.empate ? null : resultado.ganador,
+  // Transacción: si dos llamadas terminan la partida a la vez, el resultado
+  // (Elo, estadísticas) se aplica una sola vez.
+  const { aplicado } = await transaccionPartida(partidaId, (p) => {
+    if (p.estado === "finalizada") return undefined;
+    p.estado = "finalizada";
+    delete p.turnoActual;
+    p.resultado = resultado.empate ? "empate" : "victoria";
+    if (resultado.empate) delete p.ganador;
+    else p.ganador = resultado.ganador;
+    return true;
   });
+  if (!aplicado) return;
   console.log(`[Elementales] Partida ${partidaId} finalizada. ${resultado.empate ? "Empate" : `Gana ${resultado.ganador}`}`);
 
   const partidaActualizada = { ...partida, estado: "finalizada" };
@@ -1163,6 +1238,9 @@ exports.marcarCasillaElemental = onCall(async (request) => {
   }
   if (partida.estado !== "en_curso") {
     throw new HttpsError("failed-precondition", "La partida no está en curso.");
+  }
+  if (partida.esperandoJugadores) {
+    throw new HttpsError("failed-precondition", "Esperando a que tu rival entre a la partida.");
   }
   if (partida.turnoActual?.uidActivo !== uid) {
     throw new HttpsError("failed-precondition", "No es tu turno.");
@@ -1205,6 +1283,9 @@ exports.usarBombaElemental = onCall(async (request) => {
   }
   if (partida.estado !== "en_curso") {
     throw new HttpsError("failed-precondition", "La partida no está en curso.");
+  }
+  if (partida.esperandoJugadores) {
+    throw new HttpsError("failed-precondition", "Esperando a que tu rival entre a la partida.");
   }
   if (partida.turnoActual?.uidActivo !== uid) {
     throw new HttpsError("failed-precondition", "No es tu turno.");

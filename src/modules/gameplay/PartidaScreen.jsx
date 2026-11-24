@@ -1,4 +1,6 @@
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
+import { httpsCallable } from "firebase/functions";
+import { functions } from "../../firebase/config";
 import "./PartidaScreen.css";
 import { usePartida } from "../../hooks/usePartida";
 import { usePerfilesPartida } from "../../hooks/usePerfilesPartida";
@@ -13,6 +15,8 @@ import FaseJuegoElemental from "./FaseJuegoElemental";
 import InvitacionesRetos from "../lobby/InvitacionesRetos";
 import LobbyEntrante from "../lobby/LobbyEntrante";
 import AvisoInicioPartida from "./AvisoInicioPartida";
+
+const confirmarEntradaCallable = httpsCallable(functions, "confirmarEntradaPartida");
 
 const NOMBRE_MODALIDAD = {
   estandar: "Estándar",
@@ -37,6 +41,21 @@ export default function PartidaScreen({
   const contenedorRef = useRef(null);
   // Animaciones y sonidos de colocación, activación y detonación (RQF-TAB-03).
   useEfectosPartida(partida, contenedorRef);
+
+  // Avisa al servidor que este jugador ya está dentro. El primer turno no
+  // empieza hasta que entran los dos (o pasan 20 s), así quien tarda en
+  // cargar no pierde su tiempo de colocación.
+  const partidaActiva = !!partida && partida.estado !== "finalizada" && partida.estado !== "cancelada";
+  const esperandoRival = partida?.esperandoJugadores === true;
+  useEffect(() => {
+    if (!partidaId || !user || !partidaActiva) return;
+    const confirmar = () =>
+      confirmarEntradaCallable({ partidaId }).catch((err) => console.error("Error al confirmar entrada:", err));
+    confirmar();
+    if (!esperandoRival) return;
+    const intervalo = setInterval(confirmar, 3000);
+    return () => clearInterval(intervalo);
+  }, [partidaId, user, partidaActiva, esperandoRival]);
 
   if (loading) return <div className="gp-page gp-page--centro"><p className="gp-muted">Cargando partida...</p></div>;
   if (!partida) return <div className="gp-page gp-page--centro"><p className="gp-muted">No se encontró la partida.</p></div>;
@@ -90,7 +109,7 @@ export default function PartidaScreen({
           (esElementales ? (
             <TableroElemental partida={partida} colorPorUid={colorPorUid(partida)} onCasillaClick={() => {}} deshabilitado relleno={null} />
           ) : (
-            <Tablero casillas={partida.casillas} onCasillaClick={() => {}} deshabilitado />
+            <Tablero casillas={partida.casillas} onCasillaClick={() => {}} deshabilitado ocultarBombas />
           ))}
       </div>
 

@@ -1,13 +1,67 @@
 const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
+const { onDocumentCreated } = require("firebase-functions/v2/firestore");
 
-/**
- * Amistades (RQF-SOC-03 / RQF-SOC-04).
- *
- * Modelo en Firestore (se escribe SOLO desde aquí con el Admin SDK):
- *   solicitudesAmistad/{de}_{para}  -> { de, para, deUsername, creadaEn }
- *   usuarios/{uid}/amigos/{amigoUid} -> { desde }   (una por cada lado)
- */
+
+const ALFABETO_ID_AMIGO = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+
+function generarIdAmigo() {
+  let id = "";
+  for (let i = 0; i < 8; i++) {
+    id += ALFABETO_ID_AMIGO[Math.floor(Math.random() * ALFABETO_ID_AMIGO.length)];
+  }
+  return `${id.slice(0, 4)}-${id.slice(4)}`;
+}
+
+function normalizarIdAmigo(texto) {
+  const limpio = String(texto || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+  if (limpio.length !== 8) return null;
+  return `${limpio.slice(0, 4)}-${limpio.slice(4)}`;
+}
+
+/** Devuelve el ID de amigo del jugador; si aún no tiene, le crea uno único. */
+async function asignarIdAmigo(uid) {
+  const firestore = getFirestore();
+  const usuarioRef = firestore.collection("usuarios").doc(uid);
+  for (let intento = 0; intento < 5; intento++) {
+    const candidato = generarIdAmigo();
+    const idRef = firestore.collection("idsAmigo").doc(candidato);
+    const resultado = await firestore.runTransaction(async (tx) => {
+      const [usuario, ocupado] = await Promise.all([tx.get(usuarioRef), tx.get(idRef)]);
+      if (!usuario.exists) return { sinPerfil: true };
+      if (usuario.data().idAmigo) return { idAmigo: usuario.data().idAmigo };
+      if (ocupado.exists) return null; // otro jugador ya lo tiene: se prueba otro
+      tx.create(idRef, { uid });
+      tx.update(usuarioRef, { idAmigo: candidato });
+      return { idAmigo: candidato };
+    });
+    if (resultado?.sinPerfil) return null;
+    if (resultado) return resultado.idAmigo;
+  }
+  throw new HttpsError("internal", "No se pudo generar el ID de amigo. Intenta de nuevo.");
+}
+
+/** uid del jugador dueño de un ID de amigo, o null si no existe. */
+async function uidPorIdAmigo(idAmigo) {
+  const snap = await getFirestore().collection("idsAmigo").doc(idAmigo).get();
+  return snap.exists ? snap.data().uid : null;
+}
+
+// Cada cuenta nueva recibe su ID de amigo al crearse el perfil.
+const asignarIdAmigoNuevoUsuario = onDocumentCreated("usuarios/{uid}", async (event) => {
+  if (!event.data || event.data.data()?.idAmigo) return;
+  const idAmigo = await asignarIdAmigo(event.params.uid);
+  console.log(`[Amistades] ID de amigo ${idAmigo} asignado a ${event.params.uid}.`);
+});
+
+// Para cuentas creadas antes de existir el ID de amigo: el perfil lo pide
+// al abrirse y se crea en ese momento.
+const obtenerIdAmigo = onCall(async (request) => {
+  const uid = exigirCuentaRegistrada(request);
+  const idAmigo = await asignarIdAmigo(uid);
+  if (!idAmigo) throw new HttpsError("not-found", "No se encontró tu perfil.");
+  return { idAmigo };
+});
 
 function exigirCuentaRegistrada(request) {
   const uid = request.auth?.uid;
@@ -25,10 +79,14 @@ function exigirCuentaRegistrada(request) {
 
 const enviarSolicitudAmistad = onCall(async (request) => {
   const uid = exigirCuentaRegistrada(request);
-  const uidDestino = request.data?.uidDestino;
-
-  if (!uidDestino || typeof uidDestino !== "string") {
-    throw new HttpsError("invalid-argument", "Falta el jugador destino.");
+  // La solicitud se manda con el ID de amigo, nunca con el uid interno.
+  const idAmigo = normalizarIdAmigo(request.data?.idAmigo);
+  if (!idAmigo) {
+    throw new HttpsError("invalid-argument", "El ID de amigo no es válido.");
+  }
+  const uidDestino = await uidPorIdAmigo(idAmigo);
+  if (!uidDestino) {
+    throw new HttpsError("not-found", "No existe ningún jugador con ese ID de amigo.");
   }
   if (uidDestino === uid) {
     throw new HttpsError("invalid-argument", "No puedes agregarte a ti mismo.");
@@ -132,4 +190,11 @@ const eliminarAmigo = onCall(async (request) => {
   return { exito: true };
 });
 
-module.exports = { enviarSolicitudAmistad, responderSolicitudAmistad, eliminarAmigo };
+module.exports = {
+  enviarSolicitudAmistad,
+  responderSolicitudAmistad,
+  eliminarAmigo,
+  obtenerIdAmigo,
+  asignarIdAmigoNuevoUsuario,
+  asignarIdAmigo,
+};

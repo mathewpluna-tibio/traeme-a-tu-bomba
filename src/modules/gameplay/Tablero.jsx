@@ -2,15 +2,15 @@ import { useState, useEffect, useRef } from "react";
 import { calcularDimensiones } from "./tableroUtils";
 import { IMAGEN_BOMBA, bombaMasFuerte } from "./bombasAssets";
 import { animarOcultar } from "./efectos/animaciones";
-import { useServerTimeOffset } from "../../hooks/useServerTimeOffset";
 
 const TIEMPO_VISIBLE_MS = 3000;
 
 const claveBomba = (clave, b) => `${clave}|${b.uid}|${b.colocadaEn}`;
 
-export default function Tablero({ casillas = {}, onCasillaClick, deshabilitado, casillaEnProceso }) {
+// `ocultarBombas`: en la fase de juego las bombas nunca se muestran (solo al
+// detonar). En preparación cada bomba se ve 3 s y luego se oculta.
+export default function Tablero({ casillas = {}, onCasillaClick, deshabilitado, casillaEnProceso, ocultarBombas = false }) {
   const { filas, columnas } = calcularDimensiones(casillas);
-  const offset = useServerTimeOffset();
   const tableroRef = useRef(null);
 
   const [ahora, setAhora] = useState(() => Date.now());
@@ -32,9 +32,9 @@ export default function Tablero({ casillas = {}, onCasillaClick, deshabilitado, 
       for (const b of casilla.bombas || []) {
         const k = claveBomba(clave, b);
         if (vistas[k] !== undefined) continue;
-        nuevas[k] = primeraCarga.current
-          ? t - Math.max(0, t + offset - b.colocadaEn)
-          : t;
+        // Las bombas que ya estaban al abrir el tablero (recarga, cambio de
+        // fase) se consideran ocultas: solo se muestran las que llegan después.
+        nuevas[k] = primeraCarga.current ? t - TIEMPO_VISIBLE_MS : t;
       }
     }
     primeraCarga.current = false;
@@ -46,7 +46,7 @@ export default function Tablero({ casillas = {}, onCasillaClick, deshabilitado, 
         return out;
       });
     }
-  }, [casillas, offset, vistas]);
+  }, [casillas, vistas]);
 
   const bombaVisible = (clave, b) => {
     const desde = vistas[claveBomba(clave, b)];
@@ -70,7 +70,7 @@ export default function Tablero({ casillas = {}, onCasillaClick, deshabilitado, 
       const bombas = casilla.bombas || [];
       const segura = casilla.segura === true;
       const detonada = casilla.detonada === true;
-      const visibles = detonada ? bombas : bombas.filter((b) => bombaVisible(clave, b));
+      const visibles = detonada ? bombas : ocultarBombas ? [] : bombas.filter((b) => bombaVisible(clave, b));
       const tipoVisible = bombaMasFuerte(visibles);
       if (tipoVisible && !detonada) visiblesAhora.set(clave, tipoVisible);
       const enProceso = casillaEnProceso === clave && !segura && !detonada;
@@ -99,7 +99,6 @@ export default function Tablero({ casillas = {}, onCasillaClick, deshabilitado, 
               draggable="false"
             />
           )}
-          {visibles.length > 1 && <span className="gp-cell-count">{visibles.length}</span>}
           {segura && <span className="gp-cell-check" aria-hidden="true" />}
           {enProceso && <span className="gp-spinner" />}
         </button>

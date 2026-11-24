@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { httpsCallable } from "firebase/functions";
-import { functions } from "../../firebase/config";
+import { doc, getDoc } from "firebase/firestore";
+import { db, functions } from "../../firebase/config";
 
 const enviarSolicitudCallable = httpsCallable(functions, "enviarSolicitudAmistad");
 
@@ -40,7 +41,11 @@ export default function ModalResultados({ partida, user, onVolverAlMenu, onJugar
     setEnviandoSolicitud(true);
     setErrorSolicitud("");
     try {
-      await enviarSolicitudCallable({ uidDestino: uidRival });
+      // La solicitud se manda con el ID de amigo del rival, no con su uid.
+      const perfilRival = await getDoc(doc(db, "usuarios", uidRival));
+      const idAmigo = perfilRival.data()?.idAmigo;
+      if (!idAmigo) throw new Error("Este jugador no puede recibir solicitudes de amistad.");
+      await enviarSolicitudCallable({ idAmigo });
       setSolicitudEnviada(true);
     } catch (err) {
       console.error("Error al enviar solicitud:", err);

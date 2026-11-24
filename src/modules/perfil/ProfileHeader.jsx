@@ -16,7 +16,7 @@ export default function ProfileHeader({
   onAddFriend = (id) => console.log("Enviar solicitud de amistad a:", id),
   onChallenge = (id) => console.log("Retar a partida privada a:", id),
 }) {
-  // RQF-PER-01: el marco comprado equipado o, si no hay, el de su rango
+  
   const marco = marcoDelPerfil(profile);
   const banner = obtenerBanner(profile.bannerActivo);
 
@@ -39,24 +39,27 @@ export default function ProfileHeader({
 
       <div className="pf-identity">
         <h1 className="pf-username">{profile.username}</h1>
-        {/* RQF-PER-04: título activo debajo del nombre */}
+
         <span className="pf-title-banner">{tituloVisible(profile)}</span>
-        {/* ID único: es el que se usa para buscar a un jugador (RQF-SOC-01) */}
-        <button
-          className="pf-id"
-          title="Copiar ID"
-          onClick={() => navigator.clipboard?.writeText(uid)}
-        >
-          ID: {uid}
-        </button>
+        {/* ID de amigo: con él se busca y se agrega a un jugador (RQF-SOC-01).
+            El ID interno de la base de datos ya no se muestra. */}
+        {profile.idAmigo && (
+          <button
+            className="pf-id"
+            title="Copiar ID de amigo"
+            onClick={() => navigator.clipboard?.writeText(profile.idAmigo)}
+          >
+            ID de amigo: {profile.idAmigo}
+          </button>
+        )}
       </div>
 
       {!isOwnProfile && (
         <div className="pf-actions">
           <button
             className="pf-btn pf-btn--secondary"
-            disabled={esAmigo || solicitudEnviada}
-            onClick={() => onAddFriend(uid)}
+            disabled={esAmigo || solicitudEnviada || !profile.idAmigo}
+            onClick={() => onAddFriend(profile.idAmigo)}
           >
             {esAmigo ? "✓ Amigos" : solicitudEnviada ? "Solicitud enviada ✓" : "Agregar amigo"}
           </button>

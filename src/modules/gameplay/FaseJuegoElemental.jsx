@@ -87,7 +87,9 @@ export default function FaseJuegoElemental({ partidaId, partida, perfiles = {} }
   const rivalJugador = partida.jugadores[rivalUid];
   const colorPorUid = { [uid]: miJugador.color, [rivalUid]: rivalJugador.color };
 
-  const esMiTurno = partida.turnoActual?.uidActivo === uid;
+  // Mientras el rival no entra a la partida no corre el tiempo ni se juega.
+  const esperandoRival = partida.esperandoJugadores === true;
+  const esMiTurno = !esperandoRival && partida.turnoActual?.uidActivo === uid;
   const finalizaEn = partida.turnoActual?.finalizaEn;
   const estoyCongelado = (miJugador.congeladoPorTurnos || 0) > 0;
 
@@ -281,7 +283,7 @@ export default function FaseJuegoElemental({ partidaId, partida, perfiles = {} }
     <>
       <HudPartida
         titulo="Bombas Elementales"
-        fase={rellenando ? "Relleno final" : esMiTurno ? "Tu turno" : "Turno del rival"}
+        fase={rellenando ? "Relleno final" : esperandoRival ? "Esperando rival" : esMiTurno ? "Tu turno" : "Turno del rival"}
         segundos={segundosRestantes}
         centro={
           <MarcadorCasillas
@@ -301,7 +303,7 @@ export default function FaseJuegoElemental({ partidaId, partida, perfiles = {} }
         rival={{
           perfil: perfiles[rivalUid],
           mostrarVidas: false,
-          enTurno: !esMiTurno,
+          enTurno: !esMiTurno && !esperandoRival,
           color: rivalJugador.color,
           extra: <ExtraElemental jugador={rivalJugador} />,
         }}
@@ -312,6 +314,8 @@ export default function FaseJuegoElemental({ partidaId, partida, perfiles = {} }
           ? yoRellena
             ? "El rival ya no puede moverse: te quedas con las casillas restantes"
             : "Ya no puedes moverte: el rival se queda con las casillas restantes"
+          : esperandoRival
+          ? "Esperando a que tu rival entre a la partida..."
           : esMiTurno
           ? procesando
             ? "Enviando jugada..."

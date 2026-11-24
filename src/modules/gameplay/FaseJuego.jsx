@@ -141,6 +141,7 @@ export default function FaseJuego({ partidaId, partida, perfiles = {} }) {
         onCasillaClick={handleCasillaClick}
         deshabilitado={!esMiTurno || procesando || detonando}
         casillaEnProceso={casillaEnProceso}
+        ocultarBombas
       />
     </>
   );
